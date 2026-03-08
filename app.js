@@ -240,6 +240,43 @@ function renderCartItems() {
 }
 
 
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+
+function openLightbox(productId) {
+  const p = products.find(p => p.id === productId);
+  if (!p) return;
+
+  const overlay = document.getElementById("lightbox-overlay");
+  document.getElementById("lightbox-img").src       = p.image;
+  document.getElementById("lightbox-img").alt       = p.name;
+  document.getElementById("lightbox-cat").textContent  = p.category;
+  document.getElementById("lightbox-name").textContent = p.name;
+  document.getElementById("lightbox-desc").textContent = p.description;
+  document.getElementById("lightbox-price").textContent = `$${p.price.toFixed(2)}`;
+
+  const oldPriceEl = document.getElementById("lightbox-old-price");
+  oldPriceEl.textContent = p.oldPrice ? `$${p.oldPrice.toFixed(2)}` : "";
+
+  document.getElementById("lightbox-rating").innerHTML =
+    buildStars(p.rating) +
+    `<span class="review-count">(${p.reviewCount})</span>`;
+
+  document.getElementById("lightbox-add-btn").dataset.id = p.id;
+
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  document.body.classList.add("no-scroll");
+  document.getElementById("lightbox-close").focus();
+}
+
+function closeLightbox() {
+  const overlay = document.getElementById("lightbox-overlay");
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("no-scroll");
+}
+
+
 // ─── Cart drawer ──────────────────────────────────────────────────────────────
 
 function openCart() {
@@ -403,6 +440,30 @@ function bindEvents() {
     const btn = e.target.closest(".add-to-cart");
     if (!btn) return;
     addToCart(parseInt(btn.dataset.id, 10));
+  });
+
+  // Lightbox — open on product image click
+  document.addEventListener("click", e => {
+    const wrap = e.target.closest(".product-img-wrap");
+    if (!wrap) return;
+    const card = wrap.closest(".product-card");
+    if (!card) return;
+    openLightbox(parseInt(card.dataset.id, 10));
+  });
+
+  // Lightbox — close
+  document.getElementById("lightbox-close").addEventListener("click", closeLightbox);
+  document.getElementById("lightbox-overlay").addEventListener("click", e => {
+    if (e.target === document.getElementById("lightbox-overlay")) closeLightbox();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeLightbox();
+  });
+
+  // Lightbox — add to cart
+  document.getElementById("lightbox-add-btn").addEventListener("click", e => {
+    addToCart(parseInt(e.currentTarget.dataset.id, 10));
+    closeLightbox();
   });
 
   // Cart item qty / remove (delegated)
