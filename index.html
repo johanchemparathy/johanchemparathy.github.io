@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FormaMaker — Custom 3D Prints</title>
+  <meta name="description" content="Locally made 3D prints — collectibles, keychains, home items and more. Custom orders welcome. In-person delivery.">
+
+  <meta property="og:title"       content="FormaMaker — Custom 3D Prints">
+  <meta property="og:description" content="Handcrafted 3D prints, delivered in person. Custom ideas always welcome.">
+  <meta property="og:type"        content="website">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══ HEADER ══════════════════════════════════════════════════════════════ -->
+<header class="site-header">
+  <div class="header-inner container">
+
+    <a href="#" class="logo" aria-label="FormaMaker home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">FormaMaker</span>
+    </a>
+
+    <div class="search-wrap" role="search">
+      <label for="search-input" class="sr-only">Search prints</label>
+      <input
+        type="search"
+        id="search-input"
+        class="search-input"
+        placeholder="Search prints…"
+        autocomplete="off"
+        spellcheck="false"
+      >
+    </div>
+
+    <div class="header-right">
+      <a href="#order-section" class="nav-link desktop-only">Custom Order</a>
+      <button id="cart-btn" class="cart-btn" aria-label="Open cart (0 items)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span id="cart-count" class="cart-count" aria-live="polite"></span>
+      </button>
+      <button id="hamburger-btn" class="hamburger-btn mobile-only" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+  </div>
+
+  <nav id="mobile-menu" class="mobile-menu" aria-label="Site navigation">
+    <a href="#products-section">Shop All Prints</a>
+    <a href="#order-section">Custom Order</a>
+    <a href="#footer">Contact</a>
+  </nav>
+</header>
+
+<!-- Category sub-nav -->
+<nav class="cat-nav" aria-label="Category navigation">
+  <div class="cat-nav-inner container">
+    <a href="#products-section">All Prints</a>
+    <a href="#featured-section">Popular</a>
+    <a href="#order-section">Custom Order</a>
+  </div>
+</nav>
+
+
+<!-- ═══ HERO ════════════════════════════════════════════════════════════════ -->
+<section class="hero" aria-label="Welcome">
+  <div class="hero-inner container">
+    <div class="hero-tag">In-person delivery · Locally made</div>
+    <h1 class="hero-title">3D Prints<br><span class="hero-accent">Crafted for You</span></h1>
+    <p class="hero-sub">Browse our range of handcrafted 3D prints or request something completely custom. No shipping — we hand-deliver in person.</p>
+    <div class="hero-actions">
+      <button id="hero-shop-btn" class="btn btn-primary btn-lg">Browse Prints</button>
+      <button id="hero-custom-btn" class="btn btn-ghost btn-lg">Request Custom</button>
+    </div>
+    <div class="hero-stats" aria-hidden="true">
+      <div class="stat"><span class="stat-num">100%</span><span class="stat-label">Local</span></div>
+      <div class="stat-divider"></div>
+      <div class="stat"><span class="stat-num">Custom</span><span class="stat-label">Orders welcome</span></div>
+      <div class="stat-divider"></div>
+      <div class="stat"><span class="stat-num">In-person</span><span class="stat-label">Delivery</span></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ CATEGORIES ══════════════════════════════════════════════════════════ -->
+<section class="section-categories" aria-label="Browse by category">
+  <div class="container">
+    <div id="category-list" class="category-list" role="group" aria-label="Category filters"></div>
+  </div>
+</section>
+
+
+<!-- ═══ FEATURED ════════════════════════════════════════════════════════════ -->
+<section id="featured-section" class="section-products" aria-label="Popular items">
+  <div class="container">
+    <div class="section-head">
+      <h2 class="section-title">Popular Items</h2>
+      <p class="section-sub">Customer favourites</p>
+    </div>
+    <div id="featured-grid" class="product-grid"></div>
+  </div>
+</section>
+
+
+<!-- ═══ ALL PRODUCTS ════════════════════════════════════════════════════════ -->
+<section id="products-section" class="section-products" aria-label="All prints">
+  <div class="container">
+    <div class="section-head">
+      <h2 class="section-title">All Prints</h2>
+      <p class="section-sub">Filter by category or search above</p>
+    </div>
+    <div id="product-grid" class="product-grid"></div>
+  </div>
+</section>
+
+
+<!-- ═══ CUSTOM ORDER CTA ════════════════════════════════════════════════════ -->
+<section id="order-section" class="section-cta" aria-label="Custom order">
+  <div class="container">
+    <div class="cta-inner">
+      <div class="cta-text">
+        <div class="cta-tag">Custom Orders</div>
+        <h2>Got a specific idea?</h2>
+        <p>Want a unique colour, a personalised name, a specific size — or something completely new? Send a request and we'll make it happen. Everything is arranged in person, no online payment needed.</p>
+        <ul class="cta-list">
+          <li><span class="cta-icon">◆</span> Any colour or material</li>
+          <li><span class="cta-icon">◆</span> Custom text or names</li>
+          <li><span class="cta-icon">◆</span> Unique sizes &amp; designs</li>
+          <li><span class="cta-icon">◆</span> In-person handoff — no shipping</li>
+        </ul>
+        <button id="open-cart-custom-btn" class="btn btn-primary btn-lg">Start a Custom Request</button>
+      </div>
+      <div class="cta-visual" aria-hidden="true">
+        <div class="cta-box">
+          <div class="cta-box-icon">✦</div>
+          <p>Describe your idea in the order form and we'll be in touch to arrange everything.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ FOOTER ══════════════════════════════════════════════════════════════ -->
+<footer id="footer" class="site-footer" aria-label="Site footer">
+  <div class="footer-inner container">
+
+    <div class="footer-brand">
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span class="logo-text">FormaMaker</span>
+      </div>
+      <p>Locally crafted 3D prints, delivered in person. Custom ideas always welcome.</p>
+    </div>
+
+    <nav class="footer-links" aria-label="Shop links">
+      <h4>Shop</h4>
+      <a href="#products-section">All Prints</a>
+      <a href="#featured-section">Popular Items</a>
+      <a href="#order-section">Custom Orders</a>
+    </nav>
+
+    <div class="footer-contact">
+      <h4>Contact</h4>
+      <!-- Replace with your actual details -->
+      <p>📱 +1 (555) 000-0000</p>
+      <p>📧 hello@formamaker.com</p>
+      <p>📍 Your City / Area</p>
+      <a href="#" class="footer-social">@ Instagram</a>
+    </div>
+
+  </div>
+  <div class="footer-bottom">
+    <p>© 2025 FormaMaker &nbsp;·&nbsp; In-person delivery only &nbsp;·&nbsp; No online payment required</p>
+  </div>
+</footer>
+
+
+<!-- ═══ CART DRAWER ══════════════════════════════════════════════════════════ -->
+<div id="cart-overlay" class="cart-overlay" aria-hidden="true"></div>
+
+<aside id="cart-drawer" class="cart-drawer" aria-label="Cart and order form" aria-modal="true" role="dialog">
+
+  <div class="cart-header">
+    <h2>Your Order</h2>
+    <button id="cart-close-btn" class="cart-close-btn" aria-label="Close cart">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div class="cart-body">
+
+    <div id="cart-empty" class="cart-empty" style="display:flex;">
+      <div class="cart-empty-icon" aria-hidden="true">○</div>
+      <p>Your cart is empty.</p>
+      <p>Add some prints to get started.</p>
+    </div>
+
+    <div id="cart-items" class="cart-items" aria-live="polite"></div>
+
+    <div class="cart-subtotal-row" aria-live="polite">
+      <span>Subtotal</span>
+      <span id="cart-subtotal" class="cart-subtotal-amount">$0.00</span>
+    </div>
+
+    <div id="cart-form-section" class="cart-form-section" style="display:none;">
+
+      <div class="cart-notice" role="note">
+        <strong>Order request only.</strong> The owner will review and contact you to confirm. No payment needed now.
+      </div>
+
+      <form id="order-form" class="order-form" novalidate aria-label="Order request form">
+
+        <div class="form-group">
+          <label for="field-name">Your Name <span class="required" aria-hidden="true">*</span></label>
+          <input type="text" id="field-name" name="customerName" placeholder="e.g. Jane Smith" autocomplete="name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="field-product">Product Details <span class="required" aria-hidden="true">*</span></label>
+          <textarea id="field-product" name="productDetails" rows="4" placeholder="Colour, size, custom text, variations — any specifics about what you'd like…" required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="field-delivery">Delivery Details <span class="required" aria-hidden="true">*</span></label>
+          <textarea id="field-delivery" name="deliveryDetails" rows="3" placeholder="Where and when would you like to meet? Your area, preferred times…" required></textarea>
+        </div>
+
+        <button type="submit" id="submit-order-btn" class="btn btn-primary btn-full btn-lg">
+          Send Order Request
+        </button>
+
+        <p class="form-disclaimer">We'll contact you to confirm and arrange in-person delivery. No payment needed now.</p>
+
+      </form>
+
+      <div id="order-success" class="order-success" style="display:none;" role="alert">
+        <div class="success-icon" aria-hidden="true">✓</div>
+        <h3>Request Sent!</h3>
+        <p>Your order request has been received. We'll be in touch to confirm and arrange delivery.</p>
+        <p><strong>No payment needed right now.</strong></p>
+        <button id="new-order-btn" class="btn btn-ghost btn-full">Browse More Prints</button>
+      </div>
+
+    </div>
+  </div>
+</aside>
+
+
+<!-- ═══ TOAST ════════════════════════════════════════════════════════════════ -->
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
