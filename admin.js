@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// admin.js — FormaMaker orders dashboard
+// admin.js — FormaMaker admin dashboard (orders + inventory)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { auth, db } from "./firebase-config.js";
@@ -12,30 +12,42 @@ import {
   collection,
   onSnapshot,
   doc,
+  addDoc,
   updateDoc,
+  deleteDoc,
   orderBy,
   query,
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let allOrders       = [];
-let activeFilter    = "all";
-let unsubscribeOrders = null;
+let allOrders        = [];
+let allProducts      = [];
+let activeFilter     = "all";
+let editingDocId     = null;   // null = new product, string = editing existing
+let unsubOrders      = null;
+let unsubProducts    = null;
 
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
-const loginScreen  = document.getElementById("login-screen");
-const dashboard    = document.getElementById("dashboard");
-const loginForm    = document.getElementById("login-form");
-const loginError   = document.getElementById("login-error");
-const loginBtn     = document.getElementById("login-btn");
-const signoutBtn   = document.getElementById("signout-btn");
-const adminEmail   = document.getElementById("admin-user-email");
-const ordersList   = document.getElementById("orders-list");
-const filterBtns   = document.querySelectorAll(".status-filter-btn");
+const loginScreen    = document.getElementById("login-screen");
+const dashboard      = document.getElementById("dashboard");
+const loginForm      = document.getElementById("login-form");
+const loginError     = document.getElementById("login-error");
+const loginBtn       = document.getElementById("login-btn");
+const signoutBtn     = document.getElementById("signout-btn");
+const adminEmail     = document.getElementById("admin-user-email");
+const ordersList     = document.getElementById("orders-list");
+const inventoryList  = document.getElementById("inventory-list");
+const filterBtns     = document.querySelectorAll(".status-filter-btn");
+const modalOverlay   = document.getElementById("product-modal-overlay");
+const productForm    = document.getElementById("product-form");
+const modalTitle     = document.getElementById("product-modal-title");
+const productSaveBtn = document.getElementById("product-save-btn");
+const formError      = document.getElementById("product-form-error");
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -43,22 +55,17 @@ const filterBtns   = document.querySelectorAll(".status-filter-btn");
 // ═════════════════════════════════════════════════════════════════════════════
 
 onAuthStateChanged(auth, user => {
-  if (user) {
-    showDashboard(user);
-  } else {
-    showLogin();
-  }
+  if (user) showDashboard(user);
+  else      showLogin();
 });
 
 loginForm.addEventListener("submit", async e => {
   e.preventDefault();
   const email    = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-password").value;
-
   loginBtn.disabled    = true;
   loginBtn.textContent = "Signing in…";
   hideLoginError();
-
   try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch (err) {
@@ -69,7 +76,8 @@ loginForm.addEventListener("submit", async e => {
 });
 
 signoutBtn.addEventListener("click", async () => {
-  if (unsubscribeOrders) unsubscribeOrders();
+  unsubOrders?.();
+  unsubProducts?.();
   await signOut(auth);
 });
 
@@ -85,6 +93,7 @@ function showDashboard(user) {
   dashboard.style.display   = "block";
   adminEmail.textContent    = user.email;
   subscribeToOrders();
+  subscribeToProducts();
 }
 
 function showLoginError(msg) {
@@ -98,34 +107,43 @@ function hideLoginError() {
 
 function friendlyAuthError(code) {
   const map = {
-    "auth/user-not-found":        "No account found with that email.",
-    "auth/wrong-password":        "Incorrect password.",
-    "auth/invalid-email":         "Please enter a valid email.",
-    "auth/too-many-requests":     "Too many attempts. Try again later.",
-    "auth/invalid-credential":    "Invalid email or password.",
+    "auth/user-not-found":     "No account found with that email.",
+    "auth/wrong-password":     "Incorrect password.",
+    "auth/invalid-email":      "Please enter a valid email.",
+    "auth/too-many-requests":  "Too many attempts. Try again later.",
+    "auth/invalid-credential": "Invalid email or password.",
   };
   return map[code] || "Sign in failed. Please try again.";
 }
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-// ORDERS — FIRESTORE
+// TABS
+// ═════════════════════════════════════════════════════════════════════════════
+
+document.querySelectorAll(".admin-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById(`tab-${tab.dataset.tab}`).classList.add("active");
+  });
+});
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ORDERS
 // ═════════════════════════════════════════════════════════════════════════════
 
 function subscribeToOrders() {
   const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-
-  unsubscribeOrders = onSnapshot(q, snapshot => {
+  unsubOrders = onSnapshot(q, snapshot => {
     allOrders = snapshot.docs.map(d => ({ _id: d.id, ...d.data() }));
     updateStats();
     renderOrders();
   }, err => {
-    console.error("Firestore error:", err);
-    ordersList.innerHTML = `
-      <div class="admin-state">
-        <div class="admin-state-icon">⚠</div>
-        <p>Could not load orders. Check Firestore rules allow authenticated reads.</p>
-      </div>`;
+    console.error("Firestore orders error:", err);
+    ordersList.innerHTML = `<div class="admin-state"><div class="admin-state-icon">⚠</div><p>Could not load orders. Check Firestore rules allow authenticated reads.</p></div>`;
   });
 }
 
@@ -133,20 +151,14 @@ async function updateOrderStatus(orderId, newStatus) {
   await updateDoc(doc(db, "orders", orderId), { status: newStatus });
 }
 
-
-// ═════════════════════════════════════════════════════════════════════════════
-// STATS
-// ═════════════════════════════════════════════════════════════════════════════
-
 function updateStats() {
   const count = s => allOrders.filter(o => o.status === s).length;
   const inProgress = allOrders.filter(o =>
-    o.status === "confirmed" || o.status === "in-progress" || o.status === "ready"
+    ["confirmed","in-progress","ready"].includes(o.status)
   ).length;
   const revenue = allOrders
     .filter(o => o.status !== "cancelled")
     .reduce((sum, o) => sum + (o.total || 0), 0);
-
   document.getElementById("stat-total").textContent     = allOrders.length;
   document.getElementById("stat-new").textContent       = count("new");
   document.getElementById("stat-progress").textContent  = inProgress;
@@ -154,79 +166,55 @@ function updateStats() {
   document.getElementById("stat-revenue").textContent   = `$${revenue.toFixed(2)}`;
 }
 
-
-// ═════════════════════════════════════════════════════════════════════════════
-// RENDERING
-// ═════════════════════════════════════════════════════════════════════════════
-
 function renderOrders() {
   const filtered = activeFilter === "all"
     ? allOrders
     : allOrders.filter(o => o.status === activeFilter);
 
   if (filtered.length === 0) {
-    ordersList.innerHTML = `
-      <div class="admin-state">
-        <div class="admin-state-icon">○</div>
-        <p>${allOrders.length === 0 ? "No orders yet." : "No orders match this filter."}</p>
-      </div>`;
+    ordersList.innerHTML = `<div class="admin-state"><div class="admin-state-icon">○</div><p>${allOrders.length === 0 ? "No orders yet." : "No orders match this filter."}</p></div>`;
     return;
   }
 
-  ordersList.innerHTML = filtered.map(order => buildOrderCard(order)).join("");
+  ordersList.innerHTML = filtered.map(buildOrderCard).join("");
 
-  // Bind expand toggles
   ordersList.querySelectorAll(".order-summary").forEach(row => {
-    row.addEventListener("click", () => {
-      const card = row.closest(".order-card");
-      card.classList.toggle("expanded");
-    });
+    row.addEventListener("click", () => row.closest(".order-card").classList.toggle("expanded"));
   });
 
-  // Bind status selects
   ordersList.querySelectorAll(".status-select").forEach(sel => {
     sel.addEventListener("change", async e => {
       e.stopPropagation();
-      const orderId   = sel.dataset.id;
-      const newStatus = sel.value;
       sel.disabled = true;
-      try {
-        await updateOrderStatus(orderId, newStatus);
-      } finally {
-        sel.disabled = false;
-      }
+      try { await updateOrderStatus(sel.dataset.id, sel.value); }
+      finally { sel.disabled = false; }
     });
-    // Prevent expand toggle when clicking the select
     sel.addEventListener("click", e => e.stopPropagation());
   });
 }
 
 function buildOrderCard(order) {
-  const date     = order.createdAt?.toDate
+  const date = order.createdAt?.toDate
     ? order.createdAt.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : "—";
   const itemCount = (order.items || []).reduce((s, i) => s + (i.qty || 1), 0);
-  const status    = order.status || "new";
-
+  const status = order.status || "new";
   const itemsRows = (order.items || []).map(item => `
     <tr>
       <td>${escHtml(item.name)}</td>
       <td>${escHtml(item.category || "")}</td>
       <td class="td-right">${item.qty}</td>
       <td class="td-right">$${(item.price || 0).toFixed(2)}</td>
-      <td class="td-right">$${(item.subtotal || (item.price * item.qty) || 0).toFixed(2)}</td>
-    </tr>
-  `).join("");
-
+      <td class="td-right">$${(item.subtotal || item.price * item.qty || 0).toFixed(2)}</td>
+    </tr>`).join("");
   const statusOptions = ["new","confirmed","in-progress","ready","delivered","cancelled"]
-    .map(s => `<option value="${s}"${s === status ? " selected" : ""}>${capitalize(s)}</option>`)
-    .join("");
+    .map(s => `<option value="${s}"${s === status ? " selected" : ""}>${capitalize(s)}</option>`).join("");
 
   return `
     <div class="order-card" data-id="${order._id}">
-      <div class="order-summary" role="button" aria-expanded="false" tabindex="0">
+      <div class="order-summary" role="button" tabindex="0">
         <div class="order-col-main">
-          <div class="order-id">#${order._id.slice(0, 8).toUpperCase()}</div>
+          <div class="order-id">#${order._id.slice(0,8).toUpperCase()}</div>
           <div class="order-customer">${escHtml(order.customerName || "—")}</div>
           <div class="order-items-count">${itemCount} item${itemCount !== 1 ? "s" : ""}</div>
         </div>
@@ -235,60 +223,26 @@ function buildOrderCard(order) {
         <span class="status-badge status-${status}">${capitalize(status)}</span>
         <span class="order-toggle-icon" aria-hidden="true">▾</span>
       </div>
-
       <div class="order-detail">
         <div class="detail-grid">
-          <div>
-            <div class="detail-section-label">Customer</div>
-            <div class="detail-val">${escHtml(order.customerName || "—")}</div>
-          </div>
-          <div>
-            <div class="detail-section-label">Ordered</div>
-            <div class="detail-val">${date}</div>
-          </div>
-          <div>
-            <div class="detail-section-label">Product Details</div>
-            <div class="detail-val">${escHtml(order.productDetails || "—")}</div>
-          </div>
-          <div>
-            <div class="detail-section-label">Delivery Details</div>
-            <div class="detail-val">${escHtml(order.deliveryDetails || "—")}</div>
-          </div>
+          <div><div class="detail-section-label">Customer</div><div class="detail-val">${escHtml(order.customerName || "—")}</div></div>
+          <div><div class="detail-section-label">Ordered</div><div class="detail-val">${date}</div></div>
+          <div><div class="detail-section-label">Product Details</div><div class="detail-val">${escHtml(order.productDetails || "—")}</div></div>
+          <div><div class="detail-section-label">Delivery Details</div><div class="detail-val">${escHtml(order.deliveryDetails || "—")}</div></div>
         </div>
-
         <div class="detail-section-label">Items</div>
         <table class="order-items-table">
-          <thead>
-            <tr>
-              <th>Product</th><th>Category</th>
-              <th class="td-right">Qty</th>
-              <th class="td-right">Unit</th>
-              <th class="td-right">Subtotal</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Product</th><th>Category</th><th class="td-right">Qty</th><th class="td-right">Unit</th><th class="td-right">Subtotal</th></tr></thead>
           <tbody>${itemsRows}</tbody>
         </table>
-
-        <div class="order-total-row">
-          <span style="color:var(--text-muted);font-size:.8rem;">Order Total</span>
-          <strong>$${(order.total || 0).toFixed(2)}</strong>
-        </div>
-
+        <div class="order-total-row"><span style="color:var(--text-muted);font-size:.8rem;">Order Total</span><strong>$${(order.total || 0).toFixed(2)}</strong></div>
         <div class="status-update-bar">
           <label for="status-${order._id}">Update status:</label>
-          <select class="status-select" id="status-${order._id}" data-id="${order._id}">
-            ${statusOptions}
-          </select>
+          <select class="status-select" id="status-${order._id}" data-id="${order._id}">${statusOptions}</select>
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
 }
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// FILTER
-// ═════════════════════════════════════════════════════════════════════════════
 
 filterBtns.forEach(btn => {
   btn.addEventListener("click", () => {
@@ -300,14 +254,230 @@ filterBtns.forEach(btn => {
 });
 
 
+// ═════════════════════════════════════════════════════════════════════════════
+// INVENTORY
+// ═════════════════════════════════════════════════════════════════════════════
+
+function subscribeToProducts() {
+  const q = query(collection(db, "products"), orderBy("name"));
+  unsubProducts = onSnapshot(q, snapshot => {
+    allProducts = snapshot.docs.map(d => ({ _docId: d.id, ...d.data() }));
+    renderInventory();
+    populateCategoryDatalist();
+  }, err => {
+    console.error("Firestore products error:", err);
+    inventoryList.innerHTML = `<div class="admin-state" style="grid-column:1/-1"><div class="admin-state-icon">⚠</div><p>Could not load products. Check Firestore rules.</p></div>`;
+  });
+}
+
+function renderInventory() {
+  const countEl = document.getElementById("inv-count");
+  if (countEl) countEl.textContent = `(${allProducts.length})`;
+
+  if (allProducts.length === 0) {
+    inventoryList.innerHTML = `
+      <div class="admin-state" style="grid-column:1/-1">
+        <div class="admin-state-icon">○</div>
+        <p>No products yet. Add one or seed from defaults.</p>
+      </div>`;
+    return;
+  }
+
+  inventoryList.innerHTML = allProducts.map(buildInventoryCard).join("");
+
+  inventoryList.querySelectorAll(".inv-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => openProductModal(btn.dataset.id));
+  });
+
+  inventoryList.querySelectorAll(".inv-delete-btn").forEach(btn => {
+    btn.addEventListener("click", () => confirmDeleteProduct(btn.dataset.id, btn.dataset.name));
+  });
+}
+
+function buildInventoryCard(p) {
+  const imgs  = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+  const thumb = imgs[0] || "https://placehold.co/400x400/F1F1F3/71717A?text=No+Image";
+  const price = `$${Number(p.price || 0).toFixed(2)}`;
+  const oldPriceTag = p.oldPrice ? ` <span style="text-decoration:line-through;color:var(--text-muted);font-size:.78rem;">$${Number(p.oldPrice).toFixed(2)}</span>` : "";
+
+  return `
+    <div class="inv-card">
+      <img class="inv-thumb" src="${escHtml(thumb)}" alt="${escHtml(p.name || "")}"
+        onerror="this.src='https://placehold.co/400x400/F1F1F3/71717A?text=No+Image'">
+      <div class="inv-body">
+        <div class="inv-name">${escHtml(p.name || "Untitled")}</div>
+        <div class="inv-cat">${escHtml(p.category || "")}</div>
+        ${p.featured ? `<span class="inv-featured">Featured</span>` : ""}
+        <div class="inv-price">${price}${oldPriceTag}</div>
+      </div>
+      <div class="inv-actions">
+        <button class="btn btn-outline btn-sm inv-edit-btn" data-id="${p._docId}">Edit</button>
+        <button class="btn btn-danger btn-sm inv-delete-btn" data-id="${p._docId}" data-name="${escHtml(p.name || "")}">Delete</button>
+      </div>
+    </div>`;
+}
+
+function populateCategoryDatalist() {
+  const dl = document.getElementById("category-suggestions");
+  if (!dl) return;
+  const cats = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+  dl.innerHTML = cats.map(c => `<option value="${escHtml(c)}">`).join("");
+}
+
+
+// ─── Add / Edit modal ─────────────────────────────────────────────────────────
+
+function openProductModal(docId = null) {
+  editingDocId = docId;
+  formError.style.display = "none";
+  productForm.reset();
+  modalTitle.textContent = docId ? "Edit Product" : "Add Product";
+
+  if (docId) {
+    const p = allProducts.find(x => x._docId === docId);
+    if (!p) return;
+    document.getElementById("pf-name").value         = p.name || "";
+    document.getElementById("pf-category").value     = p.category || "";
+    document.getElementById("pf-price").value        = p.price ?? "";
+    document.getElementById("pf-old-price").value    = p.oldPrice ?? "";
+    document.getElementById("pf-rating").value       = p.rating ?? "";
+    document.getElementById("pf-review-count").value = p.reviewCount ?? "";
+    document.getElementById("pf-description").value  = p.description || "";
+    const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+    document.getElementById("pf-images").value       = imgs.join("\n");
+    document.getElementById("pf-featured").checked   = !!p.featured;
+  }
+
+  modalOverlay.style.display = "flex";
+  document.getElementById("pf-name").focus();
+}
+
+function closeProductModal() {
+  modalOverlay.style.display = "none";
+  editingDocId = null;
+}
+
+document.getElementById("product-modal-close").addEventListener("click", closeProductModal);
+document.getElementById("product-modal-cancel").addEventListener("click", closeProductModal);
+modalOverlay.addEventListener("click", e => { if (e.target === modalOverlay) closeProductModal(); });
+
+document.getElementById("add-product-btn").addEventListener("click", () => openProductModal());
+
+productSaveBtn.addEventListener("click", async () => {
+  formError.style.display = "none";
+
+  const name     = document.getElementById("pf-name").value.trim();
+  const category = document.getElementById("pf-category").value.trim();
+  const price    = parseFloat(document.getElementById("pf-price").value);
+
+  if (!name)         { showFormError("Name is required."); return; }
+  if (!category)     { showFormError("Category is required."); return; }
+  if (isNaN(price))  { showFormError("A valid price is required."); return; }
+
+  const oldPriceRaw   = document.getElementById("pf-old-price").value.trim();
+  const ratingRaw     = document.getElementById("pf-rating").value.trim();
+  const reviewRaw     = document.getElementById("pf-review-count").value.trim();
+  const imagesRaw     = document.getElementById("pf-images").value.trim();
+  const imagesList    = imagesRaw ? imagesRaw.split("\n").map(s => s.trim()).filter(Boolean) : [];
+
+  const data = {
+    name,
+    category,
+    price,
+    oldPrice:    oldPriceRaw     ? parseFloat(oldPriceRaw)  : null,
+    rating:      ratingRaw       ? parseFloat(ratingRaw)    : 0,
+    reviewCount: reviewRaw       ? parseInt(reviewRaw, 10)  : 0,
+    description: document.getElementById("pf-description").value.trim(),
+    images:      imagesList,
+    featured:    document.getElementById("pf-featured").checked,
+    updatedAt:   serverTimestamp(),
+  };
+
+  productSaveBtn.disabled    = true;
+  productSaveBtn.textContent = "Saving…";
+
+  try {
+    if (editingDocId) {
+      await updateDoc(doc(db, "products", editingDocId), data);
+    } else {
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db, "products"), data);
+    }
+    closeProductModal();
+  } catch (err) {
+    console.error("Save product error:", err);
+    showFormError("Failed to save. Please try again.");
+  } finally {
+    productSaveBtn.disabled    = false;
+    productSaveBtn.textContent = "Save Product";
+  }
+});
+
+function showFormError(msg) {
+  formError.textContent   = msg;
+  formError.style.display = "block";
+}
+
+
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
+function confirmDeleteProduct(docId, name) {
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  deleteDoc(doc(db, "products", docId)).catch(err => {
+    console.error("Delete error:", err);
+    alert("Failed to delete product.");
+  });
+}
+
+
+// ─── Seed from defaults ───────────────────────────────────────────────────────
+
+document.getElementById("seed-btn").addEventListener("click", async () => {
+  if (!confirm("This will import all default products from products.js into Firestore. Products already in Firestore will not be duplicated by name. Continue?")) return;
+
+  document.getElementById("seed-btn").disabled    = true;
+  document.getElementById("seed-btn").textContent = "Seeding…";
+
+  try {
+    const { products: defaults } = await import("./products.js");
+    const existingNames = new Set(allProducts.map(p => p.name?.toLowerCase()));
+    let added = 0;
+
+    for (const p of defaults) {
+      if (existingNames.has(p.name?.toLowerCase())) continue;
+      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+      await addDoc(collection(db, "products"), {
+        name:        p.name,
+        category:    p.category,
+        price:       p.price,
+        oldPrice:    p.oldPrice ?? null,
+        rating:      p.rating ?? 0,
+        reviewCount: p.reviewCount ?? 0,
+        description: p.description || "",
+        images:      imgs,
+        featured:    p.featured ?? false,
+        createdAt:   serverTimestamp(),
+        updatedAt:   serverTimestamp(),
+      });
+      added++;
+    }
+    alert(`Done! ${added} product${added !== 1 ? "s" : ""} imported.`);
+  } catch (err) {
+    console.error("Seed error:", err);
+    alert("Seed failed: " + err.message);
+  } finally {
+    document.getElementById("seed-btn").disabled    = false;
+    document.getElementById("seed-btn").textContent = "Seed from defaults";
+  }
+});
+
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function escHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return String(str ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function capitalize(str) {

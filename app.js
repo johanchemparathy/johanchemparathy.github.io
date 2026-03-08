@@ -1,12 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // app.js — FormaMaker application logic
+// Products are loaded from Firestore in real-time.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { products, categories } from "./products.js";
+import { db } from "./firebase-config.js";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
+let products       = [];
+let categories     = ["All"];
 let cart           = JSON.parse(localStorage.getItem("formamaker_cart") || "[]");
 let activeCategory = "All";
 let searchQuery    = "";
@@ -32,6 +41,24 @@ const els = {
 };
 
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getImages(p) {
+  return Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+}
+
+function deriveCategories() {
+  const seen = new Set();
+  categories = ["All"];
+  products.forEach(p => {
+    if (p.category && !seen.has(p.category)) {
+      seen.add(p.category);
+      categories.push(p.category);
+    }
+  });
+}
+
+
 // ═════════════════════════════════════════════════════════════════════════════
 // RENDERING
 // ═════════════════════════════════════════════════════════════════════════════
@@ -53,22 +80,19 @@ function buildStars(rating) {
   ).join("");
 }
 
-function getImages(p) {
-  return p.images?.length ? p.images : [p.image];
-}
-
 function buildProductCard(p) {
-  const stars       = buildStars(p.rating);
+  const stars       = buildStars(p.rating || 0);
   const oldPriceTag = p.oldPrice
-    ? `<span class="old-price">$${p.oldPrice.toFixed(2)}</span>`
+    ? `<span class="old-price">$${Number(p.oldPrice).toFixed(2)}</span>`
     : "";
-  const thumb = getImages(p)[0];
-  const multiImg = getImages(p).length > 1;
+  const imgs     = getImages(p);
+  const thumb    = imgs[0] || "https://placehold.co/600x600/141414/333333?text=Photo+Soon";
+  const multiImg = imgs.length > 1;
 
   return `
-    <article class="product-card" data-id="${p.id}">
+    <article class="product-card" data-id="${p._docId}">
       <div class="product-img-wrap">
-        ${multiImg ? `<span class="product-img-count" aria-hidden="true">${getImages(p).length}</span>` : ""}
+        ${multiImg ? `<span class="product-img-count" aria-hidden="true">${imgs.length}</span>` : ""}
         <img
           src="${thumb}"
           alt="${p.name}"
@@ -79,19 +103,19 @@ function buildProductCard(p) {
       </div>
       <div class="product-body">
         <h3 class="product-name">${p.name}</h3>
-        <p class="product-cat">${p.category}</p>
+        <p class="product-cat">${p.category || ""}</p>
         <div class="product-rating" aria-label="Rating: ${p.rating} out of 5">
           <span class="stars" aria-hidden="true">${stars}</span>
-          <span class="review-count">(${p.reviewCount})</span>
+          <span class="review-count">(${p.reviewCount || 0})</span>
         </div>
         <div class="product-footer">
           <div class="price-group">
-            <span class="price">$${p.price.toFixed(2)}</span>
+            <span class="price">$${Number(p.price).toFixed(2)}</span>
             ${oldPriceTag}
           </div>
           <button
             class="btn btn-primary btn-sm add-to-cart"
-            data-id="${p.id}"
+            data-id="${p._docId}"
             aria-label="Add ${p.name} to cart"
           >Add</button>
         </div>
@@ -128,9 +152,9 @@ function getFilteredProducts() {
   return products.filter(p => {
     const matchCat    = activeCategory === "All" || p.category === activeCategory;
     const matchSearch = !q
-      || p.name.toLowerCase().includes(q)
-      || p.category.toLowerCase().includes(q)
-      || p.description.toLowerCase().includes(q);
+      || p.name?.toLowerCase().includes(q)
+      || p.category?.toLowerCase().includes(q)
+      || p.description?.toLowerCase().includes(q);
     return matchCat && matchSearch;
   });
 }
@@ -143,25 +167,52 @@ function clearFilters() {
   renderProducts();
 }
 
+function showGridLoading() {
+  const loading = `<div class="admin-state" style="grid-column:1/-1"><p style="color:var(--text-muted)">Loading…</p></div>`;
+  els.featuredGrid.innerHTML = loading;
+  els.productGrid.innerHTML  = loading;
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FIRESTORE — PRODUCTS
+// ═════════════════════════════════════════════════════════════════════════════
+
+function subscribeToProducts() {
+  showGridLoading();
+  const q = query(collection(db, "products"), orderBy("name"));
+  onSnapshot(q, snapshot => {
+    products = snapshot.docs.map(d => ({ _docId: d.id, ...d.data() }));
+    deriveCategories();
+    renderCategories();
+    renderFeatured();
+    renderProducts();
+  }, err => {
+    console.error("Failed to load products:", err);
+    els.productGrid.innerHTML = `<div class="no-results"><p>Could not load products.</p></div>`;
+  });
+}
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // CART
 // ═════════════════════════════════════════════════════════════════════════════
 
-function addToCart(productId) {
-  const product = products.find(p => p.id === productId);
+function addToCart(docId) {
+  const product = products.find(p => p._docId === docId);
   if (!product) return;
 
-  const existing = cart.find(item => item.id === productId);
+  const existing = cart.find(item => item.id === docId);
   if (existing) {
     existing.qty += 1;
   } else {
+    const imgs = getImages(product);
     cart.push({
-      id:       product.id,
+      id:       docId,
       name:     product.name,
       category: product.category,
-      price:    product.price,
-      image:    product.image,
+      price:    Number(product.price),
+      image:    imgs[0] || "",
       qty:      1,
     });
   }
@@ -171,18 +222,18 @@ function addToCart(productId) {
   showToast(`"${product.name}" added`);
 }
 
-function removeFromCart(productId) {
-  cart = cart.filter(item => item.id !== productId);
+function removeFromCart(docId) {
+  cart = cart.filter(item => item.id !== docId);
   persistCart();
   updateCartBadge();
   renderCartItems();
 }
 
-function changeQty(productId, delta) {
-  const item = cart.find(i => i.id === productId);
+function changeQty(docId, delta) {
+  const item = cart.find(i => i.id === docId);
   if (!item) return;
   item.qty += delta;
-  if (item.qty <= 0) { removeFromCart(productId); return; }
+  if (item.qty <= 0) { removeFromCart(docId); return; }
   persistCart();
   updateCartBadge();
   renderCartItems();
@@ -249,23 +300,24 @@ function renderCartItems() {
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 
-const lbState = { images: [], index: 0 };
+const lbState = { images: [], index: 0, docId: null };
 
-function openLightbox(productId) {
-  const p = products.find(p => p.id === productId);
+function openLightbox(docId) {
+  const p = products.find(p => p._docId === docId);
   if (!p) return;
 
   lbState.images = getImages(p);
   lbState.index  = 0;
+  lbState.docId  = docId;
 
-  document.getElementById("lightbox-cat").textContent   = p.category;
+  document.getElementById("lightbox-cat").textContent   = p.category || "";
   document.getElementById("lightbox-name").textContent  = p.name;
-  document.getElementById("lightbox-desc").textContent  = p.description;
-  document.getElementById("lightbox-price").textContent = `$${p.price.toFixed(2)}`;
-  document.getElementById("lightbox-old-price").textContent = p.oldPrice ? `$${p.oldPrice.toFixed(2)}` : "";
+  document.getElementById("lightbox-desc").textContent  = p.description || "";
+  document.getElementById("lightbox-price").textContent = `$${Number(p.price).toFixed(2)}`;
+  document.getElementById("lightbox-old-price").textContent = p.oldPrice ? `$${Number(p.oldPrice).toFixed(2)}` : "";
   document.getElementById("lightbox-rating").innerHTML  =
-    buildStars(p.rating) + `<span class="review-count">(${p.reviewCount})</span>`;
-  document.getElementById("lightbox-add-btn").dataset.id = p.id;
+    buildStars(p.rating || 0) + `<span class="review-count">(${p.reviewCount || 0})</span>`;
+  document.getElementById("lightbox-add-btn").dataset.id = docId;
 
   setLightboxImage(0);
 
@@ -280,7 +332,7 @@ function setLightboxImage(index) {
   const { images } = lbState;
   lbState.index    = index;
   const img        = document.getElementById("lightbox-img");
-  img.src          = images[index];
+  img.src          = images[index] || "";
 
   const multi = images.length > 1;
   document.getElementById("lightbox-prev").style.display = multi ? "" : "none";
@@ -357,8 +409,8 @@ async function handleOrderSubmit(e) {
       qty:      item.qty,
       subtotal: parseFloat((item.price * item.qty).toFixed(2)),
     })),
-    total:     parseFloat(cartTotal().toFixed(2)),
-    status:    "new",
+    total:  parseFloat(cartTotal().toFixed(2)),
+    status: "new",
   };
 
   const submitBtn = document.getElementById("submit-order-btn");
@@ -366,8 +418,7 @@ async function handleOrderSubmit(e) {
   submitBtn.textContent = "Sending…";
 
   try {
-    const { db }                            = await import("./firebase-config.js");
-    const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js");
+    const { addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js");
     orderData.createdAt = serverTimestamp();
     await addDoc(collection(db, "orders"), orderData);
 
@@ -436,7 +487,6 @@ function bindEvents() {
   document.getElementById("cart-btn").addEventListener("click", openCart);
   document.getElementById("cart-close-btn").addEventListener("click", closeCart);
   els.cartOverlay.addEventListener("click", closeCart);
-  document.getElementById("open-cart-custom-btn")?.addEventListener("click", openCart);
 
   // Category chips
   els.categoryList.addEventListener("click", e => {
@@ -463,11 +513,11 @@ function bindEvents() {
     }
   });
 
-  // Add to cart (delegated)
+  // Add to cart (delegated — uses string docId)
   document.addEventListener("click", e => {
     const btn = e.target.closest(".add-to-cart");
     if (!btn) return;
-    addToCart(parseInt(btn.dataset.id, 10));
+    addToCart(btn.dataset.id);
   });
 
   // Lightbox — open on product image click
@@ -476,7 +526,7 @@ function bindEvents() {
     if (!wrap) return;
     const card = wrap.closest(".product-card");
     if (!card) return;
-    openLightbox(parseInt(card.dataset.id, 10));
+    openLightbox(card.dataset.id);
   });
 
   // Lightbox — close
@@ -503,18 +553,18 @@ function bindEvents() {
     if (dot) setLightboxImage(parseInt(dot.dataset.index, 10));
   });
 
-  // Lightbox — add to cart
+  // Lightbox — add to cart (string docId)
   document.getElementById("lightbox-add-btn").addEventListener("click", e => {
-    addToCart(parseInt(e.currentTarget.dataset.id, 10));
+    addToCart(e.currentTarget.dataset.id);
     closeLightbox();
   });
 
-  // Cart item qty / remove (delegated)
+  // Cart item qty / remove (delegated — string docId)
   els.cartItems.addEventListener("click", e => {
     const qtyBtn    = e.target.closest(".qty-btn");
     const removeBtn = e.target.closest(".remove-btn");
-    if (qtyBtn)    changeQty(parseInt(qtyBtn.dataset.id, 10), parseInt(qtyBtn.dataset.delta, 10));
-    if (removeBtn) removeFromCart(parseInt(removeBtn.dataset.id, 10));
+    if (qtyBtn)    changeQty(qtyBtn.dataset.id, parseInt(qtyBtn.dataset.delta, 10));
+    if (removeBtn) removeFromCart(removeBtn.dataset.id);
   });
 
   // Order form
@@ -529,12 +579,9 @@ function bindEvents() {
     }
   });
 
-  // Hero CTAs
+  // Hero CTA
   document.getElementById("hero-shop-btn")?.addEventListener("click", () =>
     document.getElementById("products-section").scrollIntoView({ behavior: "smooth" })
-  );
-  document.getElementById("hero-custom-btn")?.addEventListener("click", () =>
-    document.getElementById("order-section").scrollIntoView({ behavior: "smooth" })
   );
 
   // Mobile hamburger
@@ -564,11 +611,9 @@ function bindEvents() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function init() {
-  renderCategories();
-  renderFeatured();
-  renderProducts();
   updateCartBadge();
   bindEvents();
+  subscribeToProducts();
 }
 
 init();
