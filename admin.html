@@ -247,6 +247,32 @@
     .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
     .checkbox-row label { font-size: .875rem; font-weight: 500; color: var(--text-mid); cursor: pointer; }
 
+    /* ── Admin order badge ── */
+    .admin-order-badge {
+      display: inline-flex; align-items: center;
+      font-size: .58rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+      color: #7C3AED; background: #F5F3FF; border: 1px solid #DDD6FE;
+      padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
+    }
+
+    /* ── Order modal item rows ── */
+    .om-item-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .om-item-name { flex: 1; font-size: .85rem; font-weight: 600; color: var(--text); }
+    .om-qty-controls { display: flex; align-items: center; gap: 6px; }
+    .om-qty-btn {
+      width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--border);
+      background: var(--bg); cursor: pointer; font-size: .9rem;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .om-qty-btn:hover { background: var(--bg-subtle); }
+    .om-qty-val { font-size: .85rem; min-width: 20px; text-align: center; }
+    .om-line-total { font-size: .85rem; font-weight: 600; color: var(--text); min-width: 64px; text-align: right; }
+    .om-remove-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: .85rem; padding: 2px 4px; }
+    .om-remove-btn:hover { color: var(--error); }
+
     /* ── Shared ── */
     .admin-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: .9rem; }
     .admin-state-icon { font-size: 2rem; margin-bottom: 12px; }
@@ -341,14 +367,17 @@
 
         <div class="orders-toolbar">
           <span class="orders-title">Orders</span>
-          <div class="status-filters" role="group" aria-label="Filter by status">
-            <button class="status-filter-btn active" data-status="all">All</button>
-            <button class="status-filter-btn" data-status="new">New</button>
-            <button class="status-filter-btn" data-status="confirmed">Confirmed</button>
-            <button class="status-filter-btn" data-status="in-progress">In Progress</button>
-            <button class="status-filter-btn" data-status="ready">Ready</button>
-            <button class="status-filter-btn" data-status="delivered">Delivered</button>
-            <button class="status-filter-btn" data-status="cancelled">Cancelled</button>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <button id="add-order-btn" class="btn btn-primary btn-sm">+ Add Order</button>
+            <div class="status-filters" role="group" aria-label="Filter by status">
+              <button class="status-filter-btn active" data-status="all">All</button>
+              <button class="status-filter-btn" data-status="new">New</button>
+              <button class="status-filter-btn" data-status="confirmed">Confirmed</button>
+              <button class="status-filter-btn" data-status="in-progress">In Progress</button>
+              <button class="status-filter-btn" data-status="ready">Ready</button>
+              <button class="status-filter-btn" data-status="delivered">Delivered</button>
+              <button class="status-filter-btn" data-status="cancelled">Cancelled</button>
+            </div>
           </div>
         </div>
 
@@ -455,6 +484,62 @@
     <div class="product-modal-footer">
       <button class="btn btn-ghost btn-sm" id="product-modal-cancel">Cancel</button>
       <button class="btn btn-primary btn-sm" id="product-save-btn">Save Product</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ ADD ORDER MODAL ══════════════════════════════════════════════════════ -->
+<div id="order-modal-overlay" class="product-modal-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Add Order">
+  <div class="product-modal">
+    <div class="product-modal-header">
+      <h2 id="order-modal-title">Add Order</h2>
+      <button class="modal-close-btn" id="order-modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <form id="order-modal-form" novalidate>
+
+        <div class="form-group">
+          <label for="of-name">Customer Name <span style="color:var(--error)">*</span></label>
+          <input type="text" id="of-name" placeholder="e.g. Jane Smith" required>
+        </div>
+
+        <div class="form-group">
+          <label for="of-product-details">Product Details / Notes</label>
+          <textarea id="of-product-details" rows="2" placeholder="Customisation, colour preferences, special requests…"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="of-delivery">Delivery Details <span style="color:var(--error)">*</span></label>
+          <textarea id="of-delivery" rows="2" placeholder="Address, pickup location, courier preference…" required></textarea>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-mid);display:block;margin-bottom:6px;">Add Items</label>
+          <div style="display:flex;gap:8px;">
+            <select id="of-product-picker" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:.875rem;background:var(--bg);color:var(--text);">
+              <option value="">— Select a product —</option>
+            </select>
+            <button type="button" id="of-add-item-btn" class="btn btn-outline btn-sm">Add</button>
+          </div>
+        </div>
+
+        <div id="of-items-list" style="display:none;margin-bottom:14px;">
+          <div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Order Items</div>
+          <div id="of-items-rows"></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;padding-top:10px;border-top:1px solid var(--border);margin-top:4px;">
+            <span style="font-size:.8rem;color:var(--text-muted);">Total</span>
+            <strong id="of-total" style="font-size:.95rem;">$0.00</strong>
+          </div>
+        </div>
+
+        <div id="order-form-error" style="display:none;font-size:.8rem;color:var(--error);background:var(--error-bg);border:1px solid #FCA5A5;border-radius:var(--radius-md);padding:8px 12px;margin-top:4px;"></div>
+
+      </form>
+    </div>
+    <div class="product-modal-footer">
+      <button class="btn btn-ghost btn-sm" id="order-modal-cancel">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="order-save-btn">Place Order</button>
     </div>
   </div>
 </div>

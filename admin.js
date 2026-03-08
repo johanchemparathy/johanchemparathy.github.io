@@ -210,11 +210,14 @@ function buildOrderCard(order) {
   const statusOptions = ["new","confirmed","in-progress","ready","delivered","cancelled"]
     .map(s => `<option value="${s}"${s === status ? " selected" : ""}>${capitalize(s)}</option>`).join("");
 
+  const adminBadge = order.source === "admin"
+    ? `<span class="admin-order-badge">Admin</span>` : "";
+
   return `
     <div class="order-card" data-id="${order._id}">
       <div class="order-summary" role="button" tabindex="0">
         <div class="order-col-main">
-          <div class="order-id">#${order._id.slice(0,8).toUpperCase()}</div>
+          <div class="order-id">#${order._id.slice(0,8).toUpperCase()}${adminBadge}</div>
           <div class="order-customer">${escHtml(order.customerName || "—")}</div>
           <div class="order-items-count">${itemCount} item${itemCount !== 1 ? "s" : ""}</div>
         </div>
@@ -468,6 +471,171 @@ document.getElementById("seed-btn").addEventListener("click", async () => {
   } finally {
     document.getElementById("seed-btn").disabled    = false;
     document.getElementById("seed-btn").textContent = "Seed from defaults";
+  }
+});
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ADD ORDER MODAL (admin verbal order entry)
+// ═════════════════════════════════════════════════════════════════════════════
+
+let orderModalItems = [];  // [{ id, name, category, price, image, qty }]
+
+const orderModalOverlay = document.getElementById("order-modal-overlay");
+const orderModalForm    = document.getElementById("order-modal-form");
+const orderFormError    = document.getElementById("order-form-error");
+const orderSaveBtn      = document.getElementById("order-save-btn");
+
+function openOrderModal() {
+  orderModalItems = [];
+  orderModalForm.reset();
+  orderFormError.style.display = "none";
+  populateProductPicker();
+  renderOrderModalItems();
+  orderModalOverlay.style.display = "flex";
+  document.getElementById("of-name").focus();
+}
+
+function closeOrderModal() {
+  orderModalOverlay.style.display = "none";
+  orderModalItems = [];
+}
+
+function populateProductPicker() {
+  const picker = document.getElementById("of-product-picker");
+  picker.innerHTML =
+    '<option value="">— Select a product —</option>' +
+    allProducts.map(p =>
+      `<option value="${p._docId}">${escHtml(p.name)} — $${Number(p.price).toFixed(2)}</option>`
+    ).join("");
+}
+
+function addOrderModalItem(docId) {
+  if (!docId) return;
+  const p = allProducts.find(x => x._docId === docId);
+  if (!p) return;
+  const existing = orderModalItems.find(i => i.id === docId);
+  if (existing) {
+    existing.qty++;
+  } else {
+    const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+    orderModalItems.push({
+      id: docId, name: p.name, category: p.category || "",
+      price: Number(p.price), image: imgs[0] || "", qty: 1,
+    });
+  }
+  renderOrderModalItems();
+}
+
+function removeOrderModalItem(docId) {
+  orderModalItems = orderModalItems.filter(i => i.id !== docId);
+  renderOrderModalItems();
+}
+
+function changeOrderModalItemQty(docId, delta) {
+  const item = orderModalItems.find(i => i.id === docId);
+  if (!item) return;
+  item.qty += delta;
+  if (item.qty <= 0) { removeOrderModalItem(docId); return; }
+  renderOrderModalItems();
+}
+
+function renderOrderModalItems() {
+  const listEl  = document.getElementById("of-items-list");
+  const rowsEl  = document.getElementById("of-items-rows");
+  const totalEl = document.getElementById("of-total");
+
+  if (orderModalItems.length === 0) {
+    listEl.style.display = "none";
+    return;
+  }
+
+  listEl.style.display = "block";
+  const total = orderModalItems.reduce((s, i) => s + i.price * i.qty, 0);
+  totalEl.textContent = `$${total.toFixed(2)}`;
+
+  rowsEl.innerHTML = orderModalItems.map(item => `
+    <div class="om-item-row" data-id="${item.id}">
+      <div class="om-item-name">${escHtml(item.name)}</div>
+      <div class="om-qty-controls">
+        <button type="button" class="om-qty-btn" data-id="${item.id}" data-delta="-1">−</button>
+        <span class="om-qty-val">${item.qty}</span>
+        <button type="button" class="om-qty-btn" data-id="${item.id}" data-delta="1">+</button>
+      </div>
+      <div class="om-line-total">$${(item.price * item.qty).toFixed(2)}</div>
+      <button type="button" class="om-remove-btn" data-id="${item.id}" aria-label="Remove">✕</button>
+    </div>
+  `).join("");
+
+  rowsEl.querySelectorAll(".om-qty-btn").forEach(btn =>
+    btn.addEventListener("click", () =>
+      changeOrderModalItemQty(btn.dataset.id, parseInt(btn.dataset.delta, 10))
+    )
+  );
+  rowsEl.querySelectorAll(".om-remove-btn").forEach(btn =>
+    btn.addEventListener("click", () => removeOrderModalItem(btn.dataset.id))
+  );
+}
+
+function showOrderFormError(msg) {
+  orderFormError.textContent   = msg;
+  orderFormError.style.display = "block";
+}
+
+// Bindings
+document.getElementById("add-order-btn").addEventListener("click", openOrderModal);
+document.getElementById("order-modal-close").addEventListener("click", closeOrderModal);
+document.getElementById("order-modal-cancel").addEventListener("click", closeOrderModal);
+orderModalOverlay.addEventListener("click", e => { if (e.target === orderModalOverlay) closeOrderModal(); });
+
+document.getElementById("of-add-item-btn").addEventListener("click", () => {
+  const picker = document.getElementById("of-product-picker");
+  addOrderModalItem(picker.value);
+  picker.value = "";
+});
+
+orderSaveBtn.addEventListener("click", async () => {
+  orderFormError.style.display = "none";
+  const customerName    = document.getElementById("of-name").value.trim();
+  const productDetails  = document.getElementById("of-product-details").value.trim();
+  const deliveryDetails = document.getElementById("of-delivery").value.trim();
+
+  if (!customerName)          { showOrderFormError("Customer name is required."); return; }
+  if (!deliveryDetails)       { showOrderFormError("Delivery details are required."); return; }
+  if (orderModalItems.length === 0) { showOrderFormError("Add at least one item to the order."); return; }
+
+  const total = orderModalItems.reduce((s, i) => s + i.price * i.qty, 0);
+
+  const orderData = {
+    customerName,
+    productDetails,
+    deliveryDetails,
+    items: orderModalItems.map(item => ({
+      id:       item.id,
+      name:     item.name,
+      category: item.category,
+      price:    item.price,
+      qty:      item.qty,
+      subtotal: parseFloat((item.price * item.qty).toFixed(2)),
+    })),
+    total:     parseFloat(total.toFixed(2)),
+    status:    "new",
+    source:    "admin",
+    createdAt: serverTimestamp(),
+  };
+
+  orderSaveBtn.disabled    = true;
+  orderSaveBtn.textContent = "Placing…";
+
+  try {
+    await addDoc(collection(db, "orders"), orderData);
+    closeOrderModal();
+  } catch (err) {
+    console.error("Add order error:", err);
+    showOrderFormError("Failed to place order. Please try again.");
+  } finally {
+    orderSaveBtn.disabled    = false;
+    orderSaveBtn.textContent = "Place Order";
   }
 });
 
