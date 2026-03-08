@@ -247,6 +247,51 @@
     .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
     .checkbox-row label { font-size: .875rem; font-weight: 500; color: var(--text-mid); cursor: pointer; }
 
+    /* ── Financial summary bar ── */
+    .financial-bar {
+      display: flex; border-bottom: 1px solid var(--border);
+      background: var(--surface); overflow-x: auto;
+    }
+    .financial-metric {
+      flex: 1; min-width: 140px; padding: 14px clamp(16px, 3vw, 28px);
+      border-right: 1px solid var(--border);
+    }
+    .financial-metric:last-child { border-right: none; }
+    .fin-label {
+      font-size: .68rem; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;
+    }
+    .fin-value { font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+    .fin-value.profit { color: #16A34A; }
+    .fin-value.loss   { color: var(--error); }
+
+    /* ── Expense rows ── */
+    .expense-list { display: flex; flex-direction: column; gap: 8px; }
+    .expense-row {
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg); padding: 13px 18px;
+      display: grid; grid-template-columns: 100px auto 1fr auto auto;
+      align-items: center; gap: 14px; box-shadow: var(--shadow-xs);
+      transition: border-color var(--transition);
+    }
+    .expense-row:hover { border-color: var(--border-mid); }
+    @media (max-width: 600px) {
+      .expense-row { grid-template-columns: auto 1fr auto auto; }
+      .expense-date { display: none; }
+    }
+    .expense-date { font-size: .78rem; color: var(--text-muted); }
+    .expense-cat-badge {
+      font-size: .65rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+      color: var(--accent); background: var(--accent-light); border: 1px solid rgba(79,70,229,.2);
+      padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    }
+    .expense-desc {
+      font-size: .875rem; color: var(--text-mid);
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .expense-amount { font-size: .9rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+    .expense-actions { display: flex; gap: 6px; }
+
     /* ── Admin order badge ── */
     .admin-order-badge {
       display: inline-flex; align-items: center;
@@ -332,10 +377,27 @@
       </div>
     </header>
 
+    <!-- Financial summary -->
+    <div class="financial-bar">
+      <div class="financial-metric">
+        <div class="fin-label">Revenue</div>
+        <div class="fin-value" id="fin-revenue">—</div>
+      </div>
+      <div class="financial-metric">
+        <div class="fin-label">Expenses</div>
+        <div class="fin-value" id="fin-expenses">—</div>
+      </div>
+      <div class="financial-metric">
+        <div class="fin-label">Profit / Loss</div>
+        <div class="fin-value" id="fin-profit">—</div>
+      </div>
+    </div>
+
     <!-- Tab bar -->
     <div class="admin-tabs">
       <button class="admin-tab active" data-tab="orders">Orders</button>
       <button class="admin-tab" data-tab="inventory">Inventory</button>
+      <button class="admin-tab" data-tab="expenses">Expenses</button>
     </div>
 
     <!-- ── ORDERS TAB ── -->
@@ -413,6 +475,25 @@
       </div>
     </div>
 
+    <!-- ── EXPENSES TAB ── -->
+    <div id="tab-expenses" class="tab-panel">
+      <div class="admin-body">
+
+        <div class="orders-toolbar">
+          <span class="orders-title">Expenses <span id="exp-count" style="font-weight:400;color:var(--text-muted);font-size:.85rem;"></span></span>
+          <button id="add-expense-btn" class="btn btn-primary btn-sm">+ Add Expense</button>
+        </div>
+
+        <div id="expenses-list" class="expense-list">
+          <div class="admin-state">
+            <div class="admin-state-icon">○</div>
+            <p>Loading expenses…</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div><!-- /dashboard -->
 
 </div><!-- /admin-wrap -->
@@ -484,6 +565,61 @@
     <div class="product-modal-footer">
       <button class="btn btn-ghost btn-sm" id="product-modal-cancel">Cancel</button>
       <button class="btn btn-primary btn-sm" id="product-save-btn">Save Product</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ EXPENSE MODAL ════════════════════════════════════════════════════════ -->
+<div id="expense-modal-overlay" class="product-modal-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Expense form">
+  <div class="product-modal">
+    <div class="product-modal-header">
+      <h2 id="expense-modal-title">Add Expense</h2>
+      <button class="modal-close-btn" id="expense-modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <form id="expense-form" novalidate>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="ef-date">Date <span style="color:var(--error)">*</span></label>
+            <input type="date" id="ef-date" required>
+          </div>
+          <div class="form-group">
+            <label for="ef-amount">Amount ($) <span style="color:var(--error)">*</span></label>
+            <input type="number" id="ef-amount" min="0" step="0.01" placeholder="0.00" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="ef-category">Category <span style="color:var(--error)">*</span></label>
+          <input type="text" id="ef-category" list="expense-category-suggestions" placeholder="e.g. Filament" required>
+          <datalist id="expense-category-suggestions">
+            <option value="Filament">
+            <option value="Materials">
+            <option value="Equipment">
+            <option value="Shipping">
+            <option value="Packaging">
+            <option value="Marketing">
+            <option value="Maintenance">
+            <option value="Software">
+            <option value="Utilities">
+            <option value="Other">
+          </datalist>
+        </div>
+
+        <div class="form-group">
+          <label for="ef-description">Description <span style="color:var(--error)">*</span></label>
+          <input type="text" id="ef-description" placeholder="e.g. 1kg PLA roll — black" required>
+        </div>
+
+        <div id="expense-form-error" style="display:none;font-size:.8rem;color:var(--error);background:var(--error-bg);border:1px solid #FCA5A5;border-radius:var(--radius-md);padding:8px 12px;"></div>
+
+      </form>
+    </div>
+    <div class="product-modal-footer">
+      <button class="btn btn-ghost btn-sm" id="expense-modal-cancel">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="expense-save-btn">Save Expense</button>
     </div>
   </div>
 </div>

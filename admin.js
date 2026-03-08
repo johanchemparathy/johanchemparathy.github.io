@@ -25,10 +25,13 @@ import {
 
 let allOrders        = [];
 let allProducts      = [];
+let allExpenses      = [];
 let activeFilter     = "all";
 let editingDocId     = null;   // null = new product, string = editing existing
+let editingExpenseId = null;
 let unsubOrders      = null;
 let unsubProducts    = null;
+let unsubExpenses    = null;
 
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
@@ -42,6 +45,7 @@ const signoutBtn     = document.getElementById("signout-btn");
 const adminEmail     = document.getElementById("admin-user-email");
 const ordersList     = document.getElementById("orders-list");
 const inventoryList  = document.getElementById("inventory-list");
+const expensesList   = document.getElementById("expenses-list");
 const filterBtns     = document.querySelectorAll(".status-filter-btn");
 const modalOverlay   = document.getElementById("product-modal-overlay");
 const productForm    = document.getElementById("product-form");
@@ -78,6 +82,7 @@ loginForm.addEventListener("submit", async e => {
 signoutBtn.addEventListener("click", async () => {
   unsubOrders?.();
   unsubProducts?.();
+  unsubExpenses?.();
   await signOut(auth);
 });
 
@@ -94,6 +99,7 @@ function showDashboard(user) {
   adminEmail.textContent    = user.email;
   subscribeToOrders();
   subscribeToProducts();
+  subscribeToExpenses();
 }
 
 function showLoginError(msg) {
@@ -140,6 +146,7 @@ function subscribeToOrders() {
   unsubOrders = onSnapshot(q, snapshot => {
     allOrders = snapshot.docs.map(d => ({ _id: d.id, ...d.data() }));
     updateStats();
+    updateFinancials();
     renderOrders();
   }, err => {
     console.error("Firestore orders error:", err);
@@ -164,6 +171,21 @@ function updateStats() {
   document.getElementById("stat-progress").textContent  = inProgress;
   document.getElementById("stat-delivered").textContent = count("delivered");
   document.getElementById("stat-revenue").textContent   = `$${revenue.toFixed(2)}`;
+}
+
+function updateFinancials() {
+  const revenue  = allOrders
+    .filter(o => o.status !== "cancelled")
+    .reduce((sum, o) => sum + (o.total || 0), 0);
+  const expenses = allExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const profit   = revenue - expenses;
+
+  document.getElementById("fin-revenue").textContent  = `$${revenue.toFixed(2)}`;
+  document.getElementById("fin-expenses").textContent = `$${expenses.toFixed(2)}`;
+
+  const profitEl = document.getElementById("fin-profit");
+  profitEl.textContent = `${profit < 0 ? "-" : ""}$${Math.abs(profit).toFixed(2)}`;
+  profitEl.className   = `fin-value ${profit >= 0 ? "profit" : "loss"}`;
 }
 
 function renderOrders() {
@@ -638,6 +660,161 @@ orderSaveBtn.addEventListener("click", async () => {
     orderSaveBtn.textContent = "Place Order";
   }
 });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// EXPENSES
+// ═════════════════════════════════════════════════════════════════════════════
+
+function subscribeToExpenses() {
+  const q = query(collection(db, "expenses"), orderBy("date", "desc"));
+  unsubExpenses = onSnapshot(q, snapshot => {
+    allExpenses = snapshot.docs.map(d => ({ _docId: d.id, ...d.data() }));
+    updateFinancials();
+    renderExpenses();
+  }, err => {
+    console.error("Firestore expenses error:", err);
+    expensesList.innerHTML = `<div class="admin-state"><div class="admin-state-icon">⚠</div><p>Could not load expenses. Check Firestore rules.</p></div>`;
+  });
+}
+
+function renderExpenses() {
+  const countEl = document.getElementById("exp-count");
+  if (countEl) {
+    const total = allExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+    countEl.textContent = allExpenses.length
+      ? `(${allExpenses.length} · $${total.toFixed(2)} total)`
+      : "";
+  }
+
+  if (allExpenses.length === 0) {
+    expensesList.innerHTML = `
+      <div class="admin-state">
+        <div class="admin-state-icon">○</div>
+        <p>No expenses recorded yet. Add your first expense.</p>
+      </div>`;
+    return;
+  }
+
+  expensesList.innerHTML = allExpenses.map(buildExpenseRow).join("");
+
+  expensesList.querySelectorAll(".exp-edit-btn").forEach(btn =>
+    btn.addEventListener("click", () => openExpenseModal(btn.dataset.id))
+  );
+  expensesList.querySelectorAll(".exp-delete-btn").forEach(btn =>
+    btn.addEventListener("click", () => confirmDeleteExpense(btn.dataset.id, btn.dataset.desc))
+  );
+}
+
+function buildExpenseRow(e) {
+  const dateStr = e.date
+    ? new Date(e.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "—";
+  return `
+    <div class="expense-row">
+      <div class="expense-date">${dateStr}</div>
+      <span class="expense-cat-badge">${escHtml(e.category || "")}</span>
+      <div class="expense-desc">${escHtml(e.description || "")}</div>
+      <div class="expense-amount">$${Number(e.amount || 0).toFixed(2)}</div>
+      <div class="expense-actions">
+        <button class="btn btn-outline btn-sm exp-edit-btn" data-id="${e._docId}">Edit</button>
+        <button class="btn btn-danger btn-sm exp-delete-btn" data-id="${e._docId}" data-desc="${escHtml(e.description || "")}">Delete</button>
+      </div>
+    </div>`;
+}
+
+
+// ─── Expense modal ─────────────────────────────────────────────────────────────
+
+const expenseModalOverlay = document.getElementById("expense-modal-overlay");
+const expenseForm         = document.getElementById("expense-form");
+const expenseFormError    = document.getElementById("expense-form-error");
+const expenseSaveBtn      = document.getElementById("expense-save-btn");
+
+function openExpenseModal(docId = null) {
+  editingExpenseId = docId;
+  expenseForm.reset();
+  expenseFormError.style.display = "none";
+  document.getElementById("expense-modal-title").textContent = docId ? "Edit Expense" : "Add Expense";
+
+  if (docId) {
+    const e = allExpenses.find(x => x._docId === docId);
+    if (!e) return;
+    document.getElementById("ef-date").value        = e.date || "";
+    document.getElementById("ef-amount").value      = e.amount ?? "";
+    document.getElementById("ef-category").value    = e.category || "";
+    document.getElementById("ef-description").value = e.description || "";
+  } else {
+    // Default date to today
+    document.getElementById("ef-date").value = new Date().toISOString().slice(0, 10);
+  }
+
+  expenseModalOverlay.style.display = "flex";
+  document.getElementById("ef-description").focus();
+}
+
+function closeExpenseModal() {
+  expenseModalOverlay.style.display = "none";
+  editingExpenseId = null;
+}
+
+document.getElementById("expense-modal-close").addEventListener("click", closeExpenseModal);
+document.getElementById("expense-modal-cancel").addEventListener("click", closeExpenseModal);
+expenseModalOverlay.addEventListener("click", e => { if (e.target === expenseModalOverlay) closeExpenseModal(); });
+document.getElementById("add-expense-btn").addEventListener("click", () => openExpenseModal());
+
+expenseSaveBtn.addEventListener("click", async () => {
+  expenseFormError.style.display = "none";
+  const date        = document.getElementById("ef-date").value;
+  const amountRaw   = document.getElementById("ef-amount").value.trim();
+  const category    = document.getElementById("ef-category").value.trim();
+  const description = document.getElementById("ef-description").value.trim();
+
+  if (!date)                { showExpenseFormError("Date is required."); return; }
+  if (!amountRaw || isNaN(parseFloat(amountRaw))) { showExpenseFormError("A valid amount is required."); return; }
+  if (!category)            { showExpenseFormError("Category is required."); return; }
+  if (!description)         { showExpenseFormError("Description is required."); return; }
+
+  const data = {
+    date,
+    amount:      parseFloat(parseFloat(amountRaw).toFixed(2)),
+    category,
+    description,
+    updatedAt:   serverTimestamp(),
+  };
+
+  expenseSaveBtn.disabled    = true;
+  expenseSaveBtn.textContent = "Saving…";
+
+  try {
+    if (editingExpenseId) {
+      await updateDoc(doc(db, "expenses", editingExpenseId), data);
+    } else {
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db, "expenses"), data);
+    }
+    closeExpenseModal();
+  } catch (err) {
+    console.error("Save expense error:", err);
+    showExpenseFormError("Failed to save. Please try again.");
+  } finally {
+    expenseSaveBtn.disabled    = false;
+    expenseSaveBtn.textContent = "Save Expense";
+  }
+});
+
+function showExpenseFormError(msg) {
+  expenseFormError.textContent   = msg;
+  expenseFormError.style.display = "block";
+}
+
+function confirmDeleteExpense(docId, description) {
+  if (!confirm(`Delete expense "${description}"? This cannot be undone.`)) return;
+  deleteDoc(doc(db, "expenses", docId)).catch(err => {
+    console.error("Delete expense error:", err);
+    alert("Failed to delete expense.");
+  });
+}
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
