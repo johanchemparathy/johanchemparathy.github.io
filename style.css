@@ -418,7 +418,7 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 /* ═══ 6. CATEGORIES ══════════════════════════════════════════════════════════ */
 
 .section-categories {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .category-list { display: flex; flex-wrap: wrap; gap: 6px; }
