@@ -22,23 +22,23 @@
 //   reading of orders (only you can read them via the Firebase console).
 //   Paste this into Firestore → Rules → Edit rules:
 //
-//   ┌─────────────────────────────────────────────────────────────────────┐
-//   │  rules_version = '2';                                               │
-//   │  service cloud.firestore {                                          │
-//   │    match /databases/{database}/documents {                          │
-//   │      match /orders/{orderId} {                                      │
-//   │        // Anyone can submit a new order (create only)               │
-//   │        allow create: if true;                                       │
-//   │        // No public read, update, or delete                         │
-//   │        allow read, update, delete: if false;                        │
-//   │      }                                                              │
-//   │      // Deny everything else by default                             │
-//   │      match /{document=**} {                                         │
-//   │        allow read, write: if false;                                 │
-//   │      }                                                              │
-//   │    }                                                                │
-//   │  }                                                                  │
-//   └─────────────────────────────────────────────────────────────────────┘
+  // ┌─────────────────────────────────────────────────────────────────────┐
+  // │  rules_version = '2';                                               │
+  // │  service cloud.firestore {                                          │
+  // │    match /databases/{database}/documents {                          │
+  // │      match /orders/{orderId} {                                      │
+  // │        // Anyone can submit a new order (create only)               │
+  // │        allow create: if true;                                       │
+  // │        // No public read, update, or delete                         │
+  // │        allow read, update, delete: if false;                        │
+  // │      }                                                              │
+  // │      // Deny everything else by default                             │
+  // │      match /{document=**} {                                         │
+  // │        allow read, write: if false;                                 │
+  // │      }                                                              │
+  // │    }                                                                │
+  // │  }                                                                  │
+  // └─────────────────────────────────────────────────────────────────────┘
 //
 // ─────────────────────────────────────────────────────────────────────────────
 //
@@ -67,12 +67,13 @@ import { getFirestore }  from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 //     Do NOT leave placeholder strings in production — orders will fail silently.
 
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId:             "YOUR_APP_ID",
+  apiKey: "AIzaSyDSr0O_IzTVuhJHULeNG9HkI46q9py7TEk",
+  authDomain: "formamaker-41e32.firebaseapp.com",
+  projectId: "formamaker-41e32",
+  storageBucket: "formamaker-41e32.firebasestorage.app",
+  messagingSenderId: "771649475396",
+  appId: "1:771649475396:web:dccf0cd45c9a7aa7c03d11",
+  measurementId: "G-FT70WSD5HX"
 };
 
 const app = initializeApp(firebaseConfig);
