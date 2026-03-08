@@ -4,8 +4,9 @@
 //
 // HOW TO CUSTOMISE:
 //  • Add or remove items from the `products` array below.
-//  • Replace the `image` URL with a local path, e.g. "./assets/images/dragon.jpg"
-//    or any direct image URL. Recommended image size: 600×600 px (square).
+//  • Use `images: ["./url1.jpg", "./url2.jpg"]` for multiple photos (gallery in lightbox).
+//    Or use the shorthand `image: "./url.jpg"` for a single photo — both work.
+//    Recommended image size: 600×600 px (square).
 //  • Set `featured: true` to show a product in the "Popular Items" row.
 //  • `oldPrice` is optional — leave it as `null` to hide the strikethrough price.
 //  • `id` values must be unique positive integers.
@@ -26,8 +27,11 @@ export const products = [
     oldPrice: 22.00,
     rating: 4.9,
     reviewCount: 47,
-    // Replace with: "./assets/images/dragon.jpg"
-    image: "./assets/images/3dprinting-image1.png",
+    images: [
+      "./assets/images/3dprinting-image1.png",
+      "https://placehold.co/600x600/1A1A2A/4F46E5?text=Dragon+Side",
+      "https://placehold.co/600x600/2A1A1A/E05555?text=Dragon+Detail",
+    ],
     description: "Fully articulated dragon with 30+ moving joints. Printed in one piece — no assembly, no glue. A showstopper.",
     featured: true,
   },
@@ -39,7 +43,11 @@ export const products = [
     oldPrice: null,
     rating: 4.8,
     reviewCount: 31,
-    image: "https://placehold.co/600x600/1A2A1A/00C896?text=Lizard",
+    images: [
+      "https://placehold.co/600x600/1A2A1A/00C896?text=Lizard+Green",
+      "https://placehold.co/600x600/2A1A1A/E05555?text=Lizard+Red",
+      "https://placehold.co/600x600/1A1A2A/7C6FCD?text=Lizard+Purple",
+    ],
     description: "Satisfying flexible lizard with a smooth articulated spine. Great desk fidget and conversation piece.",
     featured: false,
   },
@@ -51,7 +59,10 @@ export const products = [
     oldPrice: null,
     rating: 5.0,
     reviewCount: 83,
-    image: "https://placehold.co/600x600/1A1A2A/7C6FCD?text=Keychain",
+    images: [
+      "https://placehold.co/600x600/1A1A2A/7C6FCD?text=Keychain+Front",
+      "https://placehold.co/600x600/22221A/C8C82A?text=Keychain+Back",
+    ],
     description: "Personalised keychain with any name or short word. Mention your preferred colour in the order notes.",
     featured: true,
   },
@@ -63,7 +74,11 @@ export const products = [
     oldPrice: 18.00,
     rating: 4.7,
     reviewCount: 22,
-    image: "https://placehold.co/600x600/221A0A/C8842A?text=Organiser",
+    images: [
+      "https://placehold.co/600x600/221A0A/C8842A?text=Organiser+Full",
+      "https://placehold.co/600x600/1E1E1E/AAAAAA?text=Organiser+Empty",
+      "https://placehold.co/600x600/0A1E22/2A9DB5?text=Organiser+Blue",
+    ],
     description: "Stackable desk organiser for pens, cables, and small items. Clean minimal design that fits any desk.",
     featured: false,
   },
@@ -75,7 +90,12 @@ export const products = [
     oldPrice: null,
     rating: 4.6,
     reviewCount: 19,
-    image: "https://placehold.co/600x600/1A241A/4CAF50?text=Planter",
+    images: [
+      "https://placehold.co/600x600/1A241A/4CAF50?text=Planter+Front",
+      "https://placehold.co/600x600/1A241A/4CAF50?text=Planter+Side",
+      "https://placehold.co/600x600/221A0A/C8842A?text=Planter+Terracotta",
+      "https://placehold.co/600x600/1A1A2A/7C6FCD?text=Planter+Indigo",
+    ],
     description: "Low-poly geometric planter for small succulents or cacti. Drainage hole included. Multiple colours available.",
     featured: false,
   },
@@ -87,7 +107,11 @@ export const products = [
     oldPrice: 10.00,
     rating: 4.8,
     reviewCount: 56,
-    image: "https://placehold.co/600x600/0A1E22/2A9DB5?text=Stand",
+    images: [
+      "https://placehold.co/600x600/0A1E22/2A9DB5?text=Stand+Front",
+      "https://placehold.co/600x600/0A1E22/2A9DB5?text=Stand+Side",
+      "https://placehold.co/600x600/1E1E1E/AAAAAA?text=Stand+Black",
+    ],
     description: "Sleek phone stand for desk use. Fits most phone sizes including cases. Great for video calls.",
     featured: true,
   },
@@ -135,7 +159,11 @@ export const products = [
     oldPrice: null,
     rating: 4.8,
     reviewCount: 15,
-    image: "https://placehold.co/600x600/221A0A/C8842A?text=Dice+Tower",
+    images: [
+      "https://placehold.co/600x600/221A0A/C8842A?text=Dice+Tower+Front",
+      "https://placehold.co/600x600/221A0A/C8842A?text=Dice+Tower+Open",
+      "https://placehold.co/600x600/1E1E1E/AAAAAA?text=Dice+Tower+Black",
+    ],
     description: "Modular dice tower for tabletop RPGs and board games. Includes landing tray. Fits standard dice.",
     featured: true,
   },
@@ -243,7 +271,10 @@ export const products = [
     oldPrice: null,
     rating: 5.0,
     reviewCount: 21,
-    image: "./assets/images/3dprinting-image2.png",
+    images: [
+      "./assets/images/3dprinting-image2.png",
+      "https://placehold.co/600x600/1A2A2A/00C896?text=Octopus+Top",
+    ],
     description: "Eight fully articulated tentacles printed in one piece. No assembly needed. A crowd favourite.",
     featured: true,
   },

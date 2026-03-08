@@ -53,17 +53,24 @@ function buildStars(rating) {
   ).join("");
 }
 
+function getImages(p) {
+  return p.images?.length ? p.images : [p.image];
+}
+
 function buildProductCard(p) {
   const stars       = buildStars(p.rating);
   const oldPriceTag = p.oldPrice
     ? `<span class="old-price">$${p.oldPrice.toFixed(2)}</span>`
     : "";
+  const thumb = getImages(p)[0];
+  const multiImg = getImages(p).length > 1;
 
   return `
     <article class="product-card" data-id="${p.id}">
       <div class="product-img-wrap">
+        ${multiImg ? `<span class="product-img-count" aria-hidden="true">${getImages(p).length}</span>` : ""}
         <img
-          src="${p.image}"
+          src="${thumb}"
           alt="${p.name}"
           class="product-img"
           loading="lazy"
@@ -242,31 +249,52 @@ function renderCartItems() {
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 
+const lbState = { images: [], index: 0 };
+
 function openLightbox(productId) {
   const p = products.find(p => p.id === productId);
   if (!p) return;
 
-  const overlay = document.getElementById("lightbox-overlay");
-  document.getElementById("lightbox-img").src       = p.image;
-  document.getElementById("lightbox-img").alt       = p.name;
-  document.getElementById("lightbox-cat").textContent  = p.category;
-  document.getElementById("lightbox-name").textContent = p.name;
-  document.getElementById("lightbox-desc").textContent = p.description;
+  lbState.images = getImages(p);
+  lbState.index  = 0;
+
+  document.getElementById("lightbox-cat").textContent   = p.category;
+  document.getElementById("lightbox-name").textContent  = p.name;
+  document.getElementById("lightbox-desc").textContent  = p.description;
   document.getElementById("lightbox-price").textContent = `$${p.price.toFixed(2)}`;
-
-  const oldPriceEl = document.getElementById("lightbox-old-price");
-  oldPriceEl.textContent = p.oldPrice ? `$${p.oldPrice.toFixed(2)}` : "";
-
-  document.getElementById("lightbox-rating").innerHTML =
-    buildStars(p.rating) +
-    `<span class="review-count">(${p.reviewCount})</span>`;
-
+  document.getElementById("lightbox-old-price").textContent = p.oldPrice ? `$${p.oldPrice.toFixed(2)}` : "";
+  document.getElementById("lightbox-rating").innerHTML  =
+    buildStars(p.rating) + `<span class="review-count">(${p.reviewCount})</span>`;
   document.getElementById("lightbox-add-btn").dataset.id = p.id;
 
+  setLightboxImage(0);
+
+  const overlay = document.getElementById("lightbox-overlay");
   overlay.classList.add("open");
   overlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("no-scroll");
   document.getElementById("lightbox-close").focus();
+}
+
+function setLightboxImage(index) {
+  const { images } = lbState;
+  lbState.index    = index;
+  const img        = document.getElementById("lightbox-img");
+  img.src          = images[index];
+
+  const multi = images.length > 1;
+  document.getElementById("lightbox-prev").style.display = multi ? "" : "none";
+  document.getElementById("lightbox-next").style.display = multi ? "" : "none";
+
+  const dotsEl = document.getElementById("lightbox-dots");
+  if (multi) {
+    dotsEl.innerHTML = images.map((_, i) =>
+      `<span class="lb-dot${i === index ? " active" : ""}" data-index="${i}" aria-label="Image ${i + 1}"></span>`
+    ).join("");
+    dotsEl.style.display = "";
+  } else {
+    dotsEl.style.display = "none";
+  }
 }
 
 function closeLightbox() {
@@ -457,7 +485,22 @@ function bindEvents() {
     if (e.target === document.getElementById("lightbox-overlay")) closeLightbox();
   });
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape") closeLightbox();
+    if (e.key === "Escape") { closeLightbox(); return; }
+    if (!document.getElementById("lightbox-overlay").classList.contains("open")) return;
+    if (e.key === "ArrowLeft")  setLightboxImage((lbState.index - 1 + lbState.images.length) % lbState.images.length);
+    if (e.key === "ArrowRight") setLightboxImage((lbState.index + 1) % lbState.images.length);
+  });
+
+  // Lightbox — prev / next / dots
+  document.getElementById("lightbox-prev").addEventListener("click", () =>
+    setLightboxImage((lbState.index - 1 + lbState.images.length) % lbState.images.length)
+  );
+  document.getElementById("lightbox-next").addEventListener("click", () =>
+    setLightboxImage((lbState.index + 1) % lbState.images.length)
+  );
+  document.getElementById("lightbox-dots").addEventListener("click", e => {
+    const dot = e.target.closest(".lb-dot");
+    if (dot) setLightboxImage(parseInt(dot.dataset.index, 10));
   });
 
   // Lightbox — add to cart
