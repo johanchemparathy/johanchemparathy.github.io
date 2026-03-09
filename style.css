@@ -241,16 +241,6 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 /* Header right */
 .header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
-.nav-link {
-  font-size: .85rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 5px 10px;
-  border-radius: var(--radius-sm);
-  transition: color var(--transition), background var(--transition);
-}
-.nav-link:hover { color: var(--text); background: var(--bg-alt); text-decoration: none; }
-
 /* Cart button */
 .cart-btn {
   position: relative;
@@ -399,19 +389,6 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 }
 
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 52px; }
-
-.hero-stats {
-  display: flex; align-items: center;
-  gap: 24px; flex-wrap: wrap;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
-}
-
-.stat { display: flex; flex-direction: column; gap: 2px; }
-.stat-num   { font-size: .9rem; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
-.stat-label { font-size: .7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
-
-.stat-divider { width: 1px; height: 28px; background: var(--border); }
 
 
 /* ═══ 6. CATEGORIES ══════════════════════════════════════════════════════════ */
@@ -569,67 +546,7 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 .no-results p { margin-bottom: 16px; }
 
 
-/* ═══ 8. CUSTOM ORDER CTA ════════════════════════════════════════════════════ */
-
-.section-cta {
-  padding-block: clamp(56px, 8vw, 96px);
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-}
-
-.cta-inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(32px, 5vw, 80px);
-  align-items: center;
-}
-
-.cta-tag {
-  display: inline-block;
-  font-size: .7rem; font-weight: 700;
-  letter-spacing: .1em; text-transform: uppercase;
-  color: var(--accent); margin-bottom: 14px;
-}
-
-.cta-text h2 {
-  font-size: clamp(1.7rem, 3vw, 2.6rem);
-  font-weight: 700; letter-spacing: -.03em;
-  color: var(--text); margin-bottom: 14px;
-  line-height: 1.15;
-}
-
-.cta-text p {
-  color: var(--text-muted); font-size: .9rem;
-  line-height: 1.75; margin-bottom: 24px; max-width: 440px;
-}
-
-.cta-list { list-style: none; margin-bottom: 32px; display: flex; flex-direction: column; gap: 10px; }
-.cta-list li {
-  display: flex; align-items: center; gap: 10px;
-  font-size: .875rem; color: var(--text-mid);
-}
-.cta-icon { color: var(--accent); font-size: .55rem; flex-shrink: 0; }
-
-.cta-box {
-  background: var(--bg-alt);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: 48px 36px;
-  text-align: center;
-  display: flex; flex-direction: column;
-  align-items: center; gap: 18px;
-  box-shadow: var(--shadow-sm);
-}
-.cta-box-icon { font-size: 2.2rem; color: var(--accent); }
-.cta-box p { font-size: .85rem; color: var(--text-muted); line-height: 1.65; max-width: 220px; }
-
-@media (max-width: 680px) {
-  .cta-inner { grid-template-columns: 1fr; }
-  .cta-visual { display: none; }
-}
-
-
-/* ═══ 9. FOOTER ══════════════════════════════════════════════════════════════ */
+/* ═══ 8. FOOTER ══════════════════════════════════════════════════════════════ */
 
 .site-footer {
   background: var(--text);

@@ -303,7 +303,7 @@ function renderInventory() {
     inventoryList.innerHTML = `
       <div class="admin-state" style="grid-column:1/-1">
         <div class="admin-state-icon">○</div>
-        <p>No products yet. Add one or seed from defaults.</p>
+        <p>No products yet. Add one to get started.</p>
       </div>`;
     return;
   }
@@ -453,48 +453,6 @@ function confirmDeleteProduct(docId, name) {
     alert("Failed to delete product.");
   });
 }
-
-
-// ─── Seed from defaults ───────────────────────────────────────────────────────
-
-document.getElementById("seed-btn").addEventListener("click", async () => {
-  if (!confirm("This will import all default products from products.js into Firestore. Products already in Firestore will not be duplicated by name. Continue?")) return;
-
-  document.getElementById("seed-btn").disabled    = true;
-  document.getElementById("seed-btn").textContent = "Seeding…";
-
-  try {
-    const { products: defaults } = await import("./products.js");
-    const existingNames = new Set(allProducts.map(p => p.name?.toLowerCase()));
-    let added = 0;
-
-    for (const p of defaults) {
-      if (existingNames.has(p.name?.toLowerCase())) continue;
-      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-      await addDoc(collection(db, "products"), {
-        name:        p.name,
-        category:    p.category,
-        price:       p.price,
-        oldPrice:    p.oldPrice ?? null,
-        rating:      p.rating ?? 0,
-        reviewCount: p.reviewCount ?? 0,
-        description: p.description || "",
-        images:      imgs,
-        featured:    p.featured ?? false,
-        createdAt:   serverTimestamp(),
-        updatedAt:   serverTimestamp(),
-      });
-      added++;
-    }
-    alert(`Done! ${added} product${added !== 1 ? "s" : ""} imported.`);
-  } catch (err) {
-    console.error("Seed error:", err);
-    alert("Seed failed: " + err.message);
-  } finally {
-    document.getElementById("seed-btn").disabled    = false;
-    document.getElementById("seed-btn").textContent = "Seed from defaults";
-  }
-});
 
 
 // ═════════════════════════════════════════════════════════════════════════════
