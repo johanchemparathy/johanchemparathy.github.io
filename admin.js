@@ -213,6 +213,16 @@ function renderOrders() {
     });
     sel.addEventListener("click", e => e.stopPropagation());
   });
+
+  ordersList.querySelectorAll(".delete-order-btn").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      if (!confirm("Delete this order? This cannot be undone.")) return;
+      btn.disabled = true;
+      try { await deleteDoc(doc(db, "orders", btn.dataset.id)); }
+      catch (err) { console.error("Delete order error:", err); btn.disabled = false; }
+    });
+  });
 }
 
 function buildOrderCard(order) {
@@ -264,6 +274,7 @@ function buildOrderCard(order) {
         <div class="status-update-bar">
           <label for="status-${order._id}">Update status:</label>
           <select class="status-select" id="status-${order._id}" data-id="${order._id}">${statusOptions}</select>
+          <button class="btn btn-danger btn-sm delete-order-btn" data-id="${order._id}">Delete</button>
         </div>
       </div>
     </div>`;

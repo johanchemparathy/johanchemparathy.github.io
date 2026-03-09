@@ -151,6 +151,14 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
 
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+.btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+.btn-danger:disabled { opacity: .5; cursor: not-allowed; }
+
 .btn-ghost {
   background: var(--bg);
   color: var(--text-mid);
