@@ -352,7 +352,7 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 /* ═══ 5. HERO ════════════════════════════════════════════════════════════════ */
 
 .hero {
-  padding-block: clamp(20px, 5vw, 20px);
+  padding-block: clamp(20px, 0vw, 20px);
   border-bottom: 1px solid var(--border);
   background:
     radial-gradient(ellipse 70% 60% at 10% 50%, rgba(79,70,229,.04) 0%, transparent 60%),
