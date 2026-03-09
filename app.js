@@ -18,6 +18,7 @@ let products       = [];
 let categories     = ["All"];
 let cart           = JSON.parse(localStorage.getItem("formamaker_cart") || "[]");
 let activeCategory = "All";
+let searchQuery    = "";
 
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ const els = {
   categoryList:    document.getElementById("category-list"),
   productGrid:     document.getElementById("product-grid"),
   featuredGrid:    document.getElementById("featured-grid"),
+  searchInput:     document.getElementById("search-input"),
   orderForm:       document.getElementById("order-form"),
   orderSuccess:    document.getElementById("order-success"),
   toast:           document.getElementById("toast"),
@@ -146,13 +148,21 @@ function renderFeatured() {
 }
 
 function getFilteredProducts() {
-  return products.filter(p =>
-    activeCategory === "All" || p.category === activeCategory
-  );
+  const q = searchQuery.toLowerCase().trim();
+  return products.filter(p => {
+    const matchCat    = activeCategory === "All" || p.category === activeCategory;
+    const matchSearch = !q
+      || p.name?.toLowerCase().includes(q)
+      || p.category?.toLowerCase().includes(q)
+      || p.description?.toLowerCase().includes(q);
+    return matchCat && matchSearch;
+  });
 }
 
 function clearFilters() {
   activeCategory = "All";
+  searchQuery    = "";
+  els.searchInput.value = "";
   renderCategories();
   renderProducts();
 }
@@ -487,6 +497,20 @@ function bindEvents() {
     renderProducts();
     document.getElementById("products-section")
       .scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  // Search
+  els.searchInput.addEventListener("input", () => {
+    searchQuery = els.searchInput.value;
+    renderProducts();
+  });
+  els.searchInput.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      els.searchInput.value = "";
+      searchQuery = "";
+      renderProducts();
+      els.searchInput.blur();
+    }
   });
 
   // Add to cart (delegated — uses string docId)
