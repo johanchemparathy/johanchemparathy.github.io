@@ -358,7 +358,31 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
     var(--bg);
 }
 
-.hero-inner { max-width: 680px; }
+.hero-inner {
+  display: flex;
+  align-items: center;
+  gap: clamp(32px, 5vw, 80px);
+  max-width: 1200px;
+}
+
+.hero-content { flex: 1; min-width: 0; }
+
+.hero-image {
+  flex: 0 0 auto;
+  width: clamp(260px, 35vw, 480px);
+}
+
+.hero-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .hero-inner { flex-direction: column; }
+  .hero-image { display: none; }
+}
 
 .hero-tag {
   display: inline-flex;
