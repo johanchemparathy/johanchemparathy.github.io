@@ -4,6 +4,16 @@
 
 import { auth, db } from "./firebase-config.js";
 import {
+  createOrderWithInventory,
+  deleteOrderWithInventory,
+  generateProductId,
+  getAvailableCount,
+  normalizeProduct,
+  parseInventoryCountInput,
+  sanitizeProductId,
+  updateOrderStatusWithInventory,
+} from "./inventory.js";
+import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
@@ -155,7 +165,7 @@ function subscribeToOrders() {
 }
 
 async function updateOrderStatus(orderId, newStatus) {
-  await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+  await updateOrderStatusWithInventory(orderId, newStatus);
 }
 
 function updateStats() {
@@ -208,8 +218,16 @@ function renderOrders() {
     sel.addEventListener("change", async e => {
       e.stopPropagation();
       sel.disabled = true;
-      try { await updateOrderStatus(sel.dataset.id, sel.value); }
-      finally { sel.disabled = false; }
+      const existingOrder = allOrders.find(order => order._id === sel.dataset.id);
+      try {
+        await updateOrderStatus(sel.dataset.id, sel.value);
+      } catch (err) {
+        console.error("Update order status error:", err);
+        sel.value = existingOrder?.status || "new";
+        alert(err.message || "Failed to update order status.");
+      } finally {
+        sel.disabled = false;
+      }
     });
     sel.addEventListener("click", e => e.stopPropagation());
   });
@@ -219,8 +237,13 @@ function renderOrders() {
       e.stopPropagation();
       if (!confirm("Delete this order? This cannot be undone.")) return;
       btn.disabled = true;
-      try { await deleteDoc(doc(db, "orders", btn.dataset.id)); }
-      catch (err) { console.error("Delete order error:", err); btn.disabled = false; }
+      try {
+        await deleteOrderWithInventory(btn.dataset.id);
+      } catch (err) {
+        console.error("Delete order error:", err);
+        alert(err.message || "Failed to delete order.");
+        btn.disabled = false;
+      }
     });
   });
 }
@@ -233,7 +256,10 @@ function buildOrderCard(order) {
   const status = order.status || "new";
   const itemsRows = (order.items || []).map(item => `
     <tr>
-      <td>${escHtml(item.name)}</td>
+      <td>
+        <div>${escHtml(item.name)}</div>
+        ${item.productId ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">${escHtml(item.productId)}</div>` : ""}
+      </td>
       <td>${escHtml(item.category || "")}</td>
       <td class="td-right">${item.qty}</td>
       <td class="td-right">$${(item.price || 0).toFixed(2)}</td>
@@ -297,7 +323,7 @@ filterBtns.forEach(btn => {
 function subscribeToProducts() {
   const q = query(collection(db, "products"), orderBy("name"));
   unsubProducts = onSnapshot(q, snapshot => {
-    allProducts = snapshot.docs.map(d => ({ _docId: d.id, ...d.data() }));
+    allProducts = snapshot.docs.map(d => normalizeProduct({ _docId: d.id, ...d.data() }, d.id));
     renderInventory();
     populateCategoryDatalist();
   }, err => {
@@ -335,6 +361,9 @@ function buildInventoryCard(p) {
   const thumb = imgs[0] || "https://placehold.co/400x400/F1F1F3/71717A?text=No+Image";
   const price = `$${Number(p.price || 0).toFixed(2)}`;
   const oldPriceTag = p.oldPrice ? ` <span style="text-decoration:line-through;color:var(--text-muted);font-size:.78rem;">$${Number(p.oldPrice).toFixed(2)}</span>` : "";
+  const totalCount = p.totalCount === null ? "Not set" : p.totalCount;
+  const availableCount = p.availableCount === null ? "Not set" : p.availableCount;
+  const stockClass = p.availableCount === 0 ? " inv-stock-pill soldout" : " inv-stock-pill";
 
   return `
     <div class="inv-card">
@@ -343,6 +372,17 @@ function buildInventoryCard(p) {
       <div class="inv-body">
         <div class="inv-name">${escHtml(p.name || "Untitled")}</div>
         <div class="inv-cat">${escHtml(p.category || "")}</div>
+        <div class="inv-product-id">${escHtml(p.productId || "Not set")}</div>
+        <div class="inv-stock-grid">
+          <div class="inv-stock-pill">
+            <span>Total</span>
+            <strong>${escHtml(String(totalCount))}</strong>
+          </div>
+          <div class="${stockClass.trim()}">
+            <span>Available</span>
+            <strong>${escHtml(String(availableCount))}</strong>
+          </div>
+        </div>
         ${p.featured ? `<span class="inv-featured">Featured</span>` : ""}
         <div class="inv-price">${price}${oldPriceTag}</div>
       </div>
@@ -373,11 +413,14 @@ function openProductModal(docId = null) {
     const p = allProducts.find(x => x._docId === docId);
     if (!p) return;
     document.getElementById("pf-name").value         = p.name || "";
+    document.getElementById("pf-product-id").value   = p.productId || "";
     document.getElementById("pf-category").value     = p.category || "";
     document.getElementById("pf-price").value        = p.price ?? "";
     document.getElementById("pf-old-price").value    = p.oldPrice ?? "";
     document.getElementById("pf-rating").value       = p.rating ?? "";
     document.getElementById("pf-review-count").value = p.reviewCount ?? "";
+    document.getElementById("pf-total-count").value  = p.totalCount ?? "";
+    document.getElementById("pf-available-count").value = p.availableCount ?? "";
     document.getElementById("pf-description").value  = p.description || "";
     const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
     document.getElementById("pf-images").value       = imgs.join("\n");
@@ -405,21 +448,51 @@ productSaveBtn.addEventListener("click", async () => {
   const name     = document.getElementById("pf-name").value.trim();
   const category = document.getElementById("pf-category").value.trim();
   const price    = parseFloat(document.getElementById("pf-price").value);
+  const totalRaw = document.getElementById("pf-total-count").value.trim();
+  const availableRaw = document.getElementById("pf-available-count").value.trim();
 
   if (!name)         { showFormError("Name is required."); return; }
   if (!category)     { showFormError("Category is required."); return; }
   if (isNaN(price))  { showFormError("A valid price is required."); return; }
+  if (!totalRaw)     { showFormError("Total count is required."); return; }
+  if (!availableRaw) { showFormError("Available count is required."); return; }
 
   const oldPriceRaw   = document.getElementById("pf-old-price").value.trim();
   const ratingRaw     = document.getElementById("pf-rating").value.trim();
   const reviewRaw     = document.getElementById("pf-review-count").value.trim();
   const imagesRaw     = document.getElementById("pf-images").value.trim();
   const imagesList    = imagesRaw ? imagesRaw.split("\n").map(s => s.trim()).filter(Boolean) : [];
+  const totalCount    = parseInventoryCountInput(totalRaw);
+  const availableCount = parseInventoryCountInput(availableRaw);
+
+  if (totalCount === null)     { showFormError("Total count must be a whole number."); return; }
+  if (availableCount === null) { showFormError("Available count must be a whole number."); return; }
+  if (availableCount > totalCount) {
+    showFormError("Available count cannot be greater than total count.");
+    return;
+  }
+
+  const takenProductIds = new Set(
+    allProducts
+      .filter(product => product._docId !== editingDocId)
+      .map(product => product.productId)
+      .filter(Boolean)
+  );
+  const rawProductId = document.getElementById("pf-product-id").value.trim();
+  const productId = sanitizeProductId(rawProductId) || generateProductId(name, takenProductIds);
+
+  if (takenProductIds.has(productId)) {
+    showFormError("Product ID must be unique.");
+    return;
+  }
 
   const data = {
+    productId,
     name,
     category,
     price,
+    totalCount,
+    availableCount,
     oldPrice:    oldPriceRaw     ? parseFloat(oldPriceRaw)  : null,
     rating:      ratingRaw       ? parseFloat(ratingRaw)    : 0,
     reviewCount: reviewRaw       ? parseInt(reviewRaw, 10)  : 0,
@@ -496,23 +569,55 @@ function populateProductPicker() {
   const picker = document.getElementById("of-product-picker");
   picker.innerHTML =
     '<option value="">— Select a product —</option>' +
-    allProducts.map(p =>
-      `<option value="${p._docId}">${escHtml(p.name)} — $${Number(p.price).toFixed(2)}</option>`
-    ).join("");
+    allProducts.map(p => {
+      const available = getAvailableCount(p);
+      const stockLabel = available === null
+        ? "stock not set"
+        : `${available} available`;
+      return `<option value="${p._docId}">${escHtml(p.name)} (${escHtml(p.productId || p._docId)}) — $${Number(p.price).toFixed(2)} — ${stockLabel}</option>`;
+    }).join("");
+}
+
+function validateTrackedInventory(product, requestedQty) {
+  const available = getAvailableCount(product);
+  if (available === null) return true;
+  if (requestedQty <= available) return true;
+
+  const label = product.name || product.productId || "This product";
+  showOrderFormError(`${label} only has ${available} available.`);
+  return false;
+}
+
+function findProductByDocId(docId) {
+  return allProducts.find(product => product._docId === docId);
+}
+
+function refreshOrderModalInventoryError() {
+  if (orderFormError.style.display === "none") return;
+  orderFormError.style.display = "none";
 }
 
 function addOrderModalItem(docId) {
   if (!docId) return;
-  const p = allProducts.find(x => x._docId === docId);
+  const p = findProductByDocId(docId);
   if (!p) return;
   const existing = orderModalItems.find(i => i.id === docId);
+  const nextQty = (existing?.qty || 0) + 1;
+  refreshOrderModalInventoryError();
+  if (!validateTrackedInventory(p, nextQty)) return;
+
   if (existing) {
-    existing.qty++;
+    existing.qty = nextQty;
   } else {
     const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
     orderModalItems.push({
-      id: docId, name: p.name, category: p.category || "",
-      price: Number(p.price), image: imgs[0] || "", qty: 1,
+      id: docId,
+      productId: p.productId || "",
+      name: p.name,
+      category: p.category || "",
+      price: Number(p.price),
+      image: imgs[0] || "",
+      qty: 1,
     });
   }
   renderOrderModalItems();
@@ -520,14 +625,21 @@ function addOrderModalItem(docId) {
 
 function removeOrderModalItem(docId) {
   orderModalItems = orderModalItems.filter(i => i.id !== docId);
+  refreshOrderModalInventoryError();
   renderOrderModalItems();
 }
 
 function changeOrderModalItemQty(docId, delta) {
   const item = orderModalItems.find(i => i.id === docId);
   if (!item) return;
-  item.qty += delta;
-  if (item.qty <= 0) { removeOrderModalItem(docId); return; }
+  const nextQty = item.qty + delta;
+  if (nextQty <= 0) { removeOrderModalItem(docId); return; }
+
+  const product = findProductByDocId(docId);
+  refreshOrderModalInventoryError();
+  if (product && !validateTrackedInventory(product, nextQty)) return;
+
+  item.qty = nextQty;
   renderOrderModalItems();
 }
 
@@ -547,7 +659,10 @@ function renderOrderModalItems() {
 
   rowsEl.innerHTML = orderModalItems.map(item => `
     <div class="om-item-row" data-id="${item.id}">
-      <div class="om-item-name">${escHtml(item.name)}</div>
+      <div class="om-item-name">
+        <div>${escHtml(item.name)}</div>
+        ${item.productId ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">${escHtml(item.productId)}</div>` : ""}
+      </div>
       <div class="om-qty-controls">
         <button type="button" class="om-qty-btn" data-id="${item.id}" data-delta="-1">−</button>
         <span class="om-qty-val">${item.qty}</span>
@@ -603,6 +718,7 @@ orderSaveBtn.addEventListener("click", async () => {
     deliveryDetails,
     items: orderModalItems.map(item => ({
       id:       item.id,
+      productId: item.productId,
       name:     item.name,
       category: item.category,
       price:    item.price,
@@ -612,18 +728,17 @@ orderSaveBtn.addEventListener("click", async () => {
     total:     parseFloat(total.toFixed(2)),
     status:    "new",
     source:    "admin",
-    createdAt: serverTimestamp(),
   };
 
   orderSaveBtn.disabled    = true;
   orderSaveBtn.textContent = "Placing…";
 
   try {
-    await addDoc(collection(db, "orders"), orderData);
+    await createOrderWithInventory(orderData);
     closeOrderModal();
   } catch (err) {
     console.error("Add order error:", err);
-    showOrderFormError("Failed to place order. Please try again.");
+    showOrderFormError(err.message || "Failed to place order. Please try again.");
   } finally {
     orderSaveBtn.disabled    = false;
     orderSaveBtn.textContent = "Place Order";

@@ -5,6 +5,11 @@
 
 import { db } from "./firebase-config.js";
 import {
+  createOrderWithInventory,
+  getAvailableCount,
+  normalizeProduct,
+} from "./inventory.js";
+import {
   collection,
   onSnapshot,
   query,
@@ -85,9 +90,14 @@ function buildProductCard(p) {
   const oldPriceTag = p.oldPrice
     ? `<span class="old-price">$${Number(p.oldPrice).toFixed(2)}</span>`
     : "";
-  const imgs     = getImages(p);
-  const thumb    = imgs[0] || "https://placehold.co/600x600/141414/333333?text=Photo+Soon";
-  const multiImg = imgs.length > 1;
+  const imgs          = getImages(p);
+  const thumb         = imgs[0] || "https://placehold.co/600x600/141414/333333?text=Photo+Soon";
+  const multiImg      = imgs.length > 1;
+  const available     = getAvailableCount(p);
+  const soldOut       = available === 0;
+  const stockLabel    = available === null
+    ? ""
+    : `<span class="product-stock${soldOut ? " sold-out" : ""}">${soldOut ? "Sold out" : `${available} available`}</span>`;
 
   return `
     <article class="product-card" data-id="${p._docId}">
@@ -113,11 +123,13 @@ function buildProductCard(p) {
             <span class="price">$${Number(p.price).toFixed(2)}</span>
             ${oldPriceTag}
           </div>
+          ${stockLabel}
           <button
             class="btn btn-primary btn-sm add-to-cart"
             data-id="${p._docId}"
             aria-label="Add ${p.name} to cart"
-          >Add</button>
+            ${soldOut ? "disabled" : ""}
+          >${soldOut ? "Sold Out" : "Add"}</button>
         </div>
       </div>
     </article>
@@ -182,7 +194,8 @@ function subscribeToProducts() {
   showGridLoading();
   const q = query(collection(db, "products"), orderBy("name"));
   onSnapshot(q, snapshot => {
-    products = snapshot.docs.map(d => ({ _docId: d.id, ...d.data() }));
+    products = snapshot.docs.map(d => normalizeProduct({ _docId: d.id, ...d.data() }, d.id));
+    syncCartWithProducts();
     deriveCategories();
     renderCategories();
     renderFeatured();
@@ -201,14 +214,22 @@ function subscribeToProducts() {
 function addToCart(docId) {
   const product = products.find(p => p._docId === docId);
   if (!product) return;
+  const available = getAvailableCount(product);
 
   const existing = cart.find(item => item.id === docId);
+  const nextQty = (existing?.qty || 0) + 1;
+  if (available !== null && nextQty > available) {
+    showToast(available === 0 ? `"${product.name}" is sold out` : `Only ${available} "${product.name}" available`);
+    return;
+  }
+
   if (existing) {
-    existing.qty += 1;
+    existing.qty = nextQty;
   } else {
     const imgs = getImages(product);
     cart.push({
       id:       docId,
+      productId: product.productId || "",
       name:     product.name,
       category: product.category,
       price:    Number(product.price),
@@ -232,11 +253,56 @@ function removeFromCart(docId) {
 function changeQty(docId, delta) {
   const item = cart.find(i => i.id === docId);
   if (!item) return;
-  item.qty += delta;
-  if (item.qty <= 0) { removeFromCart(docId); return; }
+  const nextQty = item.qty + delta;
+  if (nextQty <= 0) { removeFromCart(docId); return; }
+
+  const product = products.find(p => p._docId === docId);
+  const available = getAvailableCount(product);
+  if (delta > 0 && available !== null && nextQty > available) {
+    showToast(available === 0 ? `"${item.name}" is sold out` : `Only ${available} "${item.name}" available`);
+    return;
+  }
+
+  item.qty = nextQty;
   persistCart();
   updateCartBadge();
   renderCartItems();
+}
+
+function syncCartWithProducts() {
+  let changed = false;
+
+  cart = cart.filter(item => {
+    const product = products.find(p => p._docId === item.id);
+    if (!product) {
+      changed = true;
+      return false;
+    }
+
+    const nextImage = getImages(product)[0] || "";
+    if (
+      item.name !== product.name
+      || item.category !== product.category
+      || item.price !== Number(product.price)
+      || item.image !== nextImage
+      || item.productId !== (product.productId || "")
+    ) {
+      item.name = product.name;
+      item.category = product.category;
+      item.price = Number(product.price);
+      item.image = nextImage;
+      item.productId = product.productId || "";
+      changed = true;
+    }
+
+    return true;
+  });
+
+  if (changed) {
+    persistCart();
+    updateCartBadge();
+    if (els.cartDrawer.classList.contains("open")) renderCartItems();
+  }
 }
 
 function persistCart() {
@@ -317,7 +383,12 @@ function openLightbox(docId) {
   document.getElementById("lightbox-old-price").textContent = p.oldPrice ? `$${Number(p.oldPrice).toFixed(2)}` : "";
   document.getElementById("lightbox-rating").innerHTML  =
     buildStars(p.rating || 0) + `<span class="review-count">(${p.reviewCount || 0})</span>`;
-  document.getElementById("lightbox-add-btn").dataset.id = docId;
+  const addBtn = document.getElementById("lightbox-add-btn");
+  const available = getAvailableCount(p);
+  const soldOut = available === 0;
+  addBtn.dataset.id = docId;
+  addBtn.disabled = soldOut;
+  addBtn.textContent = soldOut ? "Sold Out" : "Add to Cart";
 
   setLightboxImage(0);
 
@@ -395,6 +466,15 @@ async function handleOrderSubmit(e) {
     showBannerError("Please add at least one item to your cart before sending a request.");
     valid = false;
   }
+  for (const item of cart) {
+    const product = products.find(p => p._docId === item.id);
+    const available = getAvailableCount(product);
+    if (available !== null && item.qty > available) {
+      showBannerError(`${item.name} only has ${available} available right now.`);
+      valid = false;
+      break;
+    }
+  }
   if (!valid) return;
 
   const orderData = {
@@ -403,6 +483,7 @@ async function handleOrderSubmit(e) {
     deliveryDetails,
     items: cart.map(item => ({
       id:       item.id,
+      productId: item.productId,
       name:     item.name,
       category: item.category,
       price:    item.price,
@@ -418,9 +499,7 @@ async function handleOrderSubmit(e) {
   submitBtn.textContent = "Sending…";
 
   try {
-    const { addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js");
-    orderData.createdAt = serverTimestamp();
-    await addDoc(collection(db, "orders"), orderData);
+    await createOrderWithInventory(orderData);
 
     cart = [];
     persistCart();
@@ -431,7 +510,7 @@ async function handleOrderSubmit(e) {
 
   } catch (err) {
     console.error("Firestore submission error:", err);
-    showBannerError("Something went wrong. Please try again or contact us directly.");
+    showBannerError(err.message || "Something went wrong. Please try again or contact us directly.");
     submitBtn.disabled    = false;
     submitBtn.textContent = "Send Order Request";
   }

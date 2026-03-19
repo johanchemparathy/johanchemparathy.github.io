@@ -192,6 +192,28 @@
     .inv-body { padding: 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
     .inv-name { font-size: .875rem; font-weight: 700; color: var(--text); line-height: 1.3; }
     .inv-cat  { font-size: .72rem; color: var(--text-muted); }
+    .inv-product-id {
+      font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--accent);
+    }
+    .inv-stock-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px; margin-top: 6px;
+    }
+    .inv-stock-pill {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 8px 10px; border-radius: var(--radius-md);
+      background: var(--bg-alt); border: 1px solid var(--border);
+    }
+    .inv-stock-pill span {
+      font-size: .66rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .inv-stock-pill strong { font-size: .9rem; color: var(--text); }
+    .inv-stock-pill.soldout {
+      background: #FEF2F2; border-color: #FECACA;
+    }
+    .inv-stock-pill.soldout strong { color: #B91C1C; }
     .inv-price { font-size: .85rem; font-weight: 700; color: var(--text); margin-top: auto; padding-top: 6px; }
     .inv-featured {
       display: inline-block; font-size: .6rem; font-weight: 700; letter-spacing: .06em;
@@ -513,6 +535,12 @@
           <input type="text" id="pf-name" placeholder="e.g. Articulated Dragon" required>
         </div>
 
+        <div class="form-group">
+          <label for="pf-product-id">Product ID <span style="color:var(--text-muted)">auto-generated if blank</span></label>
+          <input type="text" id="pf-product-id" placeholder="e.g. FM-ARTICULATED-DRAGON">
+          <span class="form-hint">Use a stable ID for inventory and order tracking.</span>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label for="pf-category">Category <span style="color:var(--error)">*</span></label>
@@ -540,6 +568,18 @@
           <label for="pf-review-count">Review Count</label>
           <input type="number" id="pf-review-count" min="0" step="1" placeholder="0">
         </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pf-total-count">Total Count <span style="color:var(--error)">*</span></label>
+            <input type="number" id="pf-total-count" min="0" step="1" placeholder="25" required>
+          </div>
+          <div class="form-group">
+            <label for="pf-available-count">Available Count <span style="color:var(--error)">*</span></label>
+            <input type="number" id="pf-available-count" min="0" step="1" placeholder="25" required>
+          </div>
+        </div>
+        <div class="form-hint" style="margin-top:-6px;margin-bottom:14px;">Available count is reduced automatically when orders are placed, restored when orders are cancelled or deleted.</div>
 
         <div class="form-group">
           <label for="pf-description">Description</label>

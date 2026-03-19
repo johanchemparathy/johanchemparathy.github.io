@@ -565,6 +565,20 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
   justify-content: space-between; gap: 8px;
   flex-wrap: wrap; margin-top: auto;
 }
+.product-stock {
+  font-size: .72rem;
+  font-weight: 600;
+  color: #166534;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+.product-stock.sold-out {
+  color: #991B1B;
+  background: #FEF2F2;
+  border-color: #FECACA;
+}
 .price-group { display: flex; align-items: baseline; gap: 5px; }
 .price { font-size: .95rem; font-weight: 700; color: var(--text); }
 .old-price { font-size: .75rem; color: var(--text-muted); text-decoration: line-through; }
