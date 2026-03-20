@@ -190,12 +190,31 @@ function updateFinancials() {
   const expenses = allExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const profit   = revenue - expenses;
 
+  const cogs = allProducts.reduce((sum, p) => {
+    const total = typeof p.totalCount === "number" ? p.totalCount : 0;
+    const avail = typeof p.availableCount === "number" ? p.availableCount : 0;
+    return sum + (total - avail) * (p.price || 0);
+  }, 0);
+
+  const actualInvCost = allProducts.reduce((sum, p) => {
+    const total = typeof p.totalCount === "number" ? p.totalCount : 0;
+    return sum + total * (p.price || 0);
+  }, 0);
+  const availInvCost = allProducts.reduce((sum, p) => {
+    const avail = typeof p.availableCount === "number" ? p.availableCount : 0;
+    return sum + avail * (p.price || 0);
+  }, 0);
+
   document.getElementById("fin-revenue").textContent  = `$${revenue.toFixed(2)}`;
   document.getElementById("fin-expenses").textContent = `$${expenses.toFixed(2)}`;
 
   const profitEl = document.getElementById("fin-profit");
   profitEl.textContent = `${profit < 0 ? "-" : ""}$${Math.abs(profit).toFixed(2)}`;
   profitEl.className   = `fin-value ${profit >= 0 ? "profit" : "loss"}`;
+
+  document.getElementById("fin-cogs").textContent       = `$${cogs.toFixed(2)}`;
+  document.getElementById("fin-actual-inv").textContent = `$${actualInvCost.toFixed(2)}`;
+  document.getElementById("fin-avail-inv").textContent  = `$${availInvCost.toFixed(2)}`;
 }
 
 function renderOrders() {
@@ -326,6 +345,7 @@ function subscribeToProducts() {
     allProducts = snapshot.docs.map(d => normalizeProduct({ _docId: d.id, ...d.data() }, d.id));
     renderInventory();
     populateCategoryDatalist();
+    updateFinancials();
   }, err => {
     console.error("Firestore products error:", err);
     inventoryList.innerHTML = `<div class="admin-state" style="grid-column:1/-1"><div class="admin-state-icon">⚠</div><p>Could not load products. Check Firestore rules.</p></div>`;
