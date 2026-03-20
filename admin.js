@@ -37,6 +37,7 @@ let allOrders        = [];
 let allProducts      = [];
 let allExpenses      = [];
 let activeFilter     = "all";
+let inventorySearchQuery = "";
 let editingDocId     = null;   // null = new product, string = editing existing
 let editingExpenseId = null;
 let unsubOrders      = null;
@@ -56,6 +57,7 @@ const adminEmail     = document.getElementById("admin-user-email");
 const ordersList     = document.getElementById("orders-list");
 const inventoryList  = document.getElementById("inventory-list");
 const expensesList   = document.getElementById("expenses-list");
+const inventorySearchInput = document.getElementById("inventory-search-input");
 const filterBtns     = document.querySelectorAll(".status-filter-btn");
 const modalOverlay   = document.getElementById("product-modal-overlay");
 const productForm    = document.getElementById("product-form");
@@ -144,6 +146,11 @@ document.querySelectorAll(".admin-tab").forEach(tab => {
     tab.classList.add("active");
     document.getElementById(`tab-${tab.dataset.tab}`).classList.add("active");
   });
+});
+
+inventorySearchInput?.addEventListener("input", e => {
+  inventorySearchQuery = e.target.value.trim().toLowerCase();
+  renderInventory();
 });
 
 
@@ -353,8 +360,13 @@ function subscribeToProducts() {
 }
 
 function renderInventory() {
+  const filteredProducts = getFilteredProducts();
   const countEl = document.getElementById("inv-count");
-  if (countEl) countEl.textContent = `(${allProducts.length})`;
+  if (countEl) {
+    countEl.textContent = filteredProducts.length === allProducts.length
+      ? `(${allProducts.length})`
+      : `(${filteredProducts.length} of ${allProducts.length})`;
+  }
 
   if (allProducts.length === 0) {
     inventoryList.innerHTML = `
@@ -365,7 +377,16 @@ function renderInventory() {
     return;
   }
 
-  inventoryList.innerHTML = allProducts.map(buildInventoryCard).join("");
+  if (filteredProducts.length === 0) {
+    inventoryList.innerHTML = `
+      <div class="admin-state" style="grid-column:1/-1">
+        <div class="admin-state-icon">○</div>
+        <p>No products match this search.</p>
+      </div>`;
+    return;
+  }
+
+  inventoryList.innerHTML = filteredProducts.map(buildInventoryCard).join("");
 
   inventoryList.querySelectorAll(".inv-edit-btn").forEach(btn => {
     btn.addEventListener("click", () => openProductModal(btn.dataset.id));
@@ -373,6 +394,24 @@ function renderInventory() {
 
   inventoryList.querySelectorAll(".inv-delete-btn").forEach(btn => {
     btn.addEventListener("click", () => confirmDeleteProduct(btn.dataset.id, btn.dataset.name));
+  });
+}
+
+function getFilteredProducts() {
+  if (!inventorySearchQuery) return allProducts;
+
+  return allProducts.filter(product => {
+    const haystack = [
+      product.name,
+      product.category,
+      product.productId,
+      product.description,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(inventorySearchQuery);
   });
 }
 

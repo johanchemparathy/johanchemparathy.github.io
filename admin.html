@@ -103,6 +103,26 @@
       transition: background var(--transition), border-color var(--transition), color var(--transition);
     }
     .status-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .inventory-search-row {
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: flex-start;
+    }
+    .inventory-search-input {
+      width: min(100%, 420px);
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: .875rem;
+      background: var(--bg);
+      color: var(--text);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .inventory-search-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: var(--accent-glow);
+    }
 
     /* ── Orders ── */
     .orders-list { display: flex; flex-direction: column; gap: 10px; }
@@ -496,6 +516,16 @@
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button id="add-product-btn" class="btn btn-primary btn-sm">+ Add Product</button>
           </div>
+        </div>
+
+        <div class="inventory-search-row">
+          <label for="inventory-search-input" class="sr-only">Search products</label>
+          <input
+            type="search"
+            id="inventory-search-input"
+            class="inventory-search-input"
+            placeholder="Search products by name, category, product ID, or description"
+          >
         </div>
 
         <div id="inventory-list" class="inventory-grid">
