@@ -443,6 +443,7 @@ function buildInventoryCard(p) {
           </div>
         </div>
         ${p.featured ? `<span class="inv-featured">Featured</span>` : ""}
+        ${p.notes ? `<span class="inv-notes-badge" title="${escHtml(p.notes)}">📋 Notes</span>` : ""}
         <div class="inv-price">${price}${oldPriceTag}</div>
       </div>
       <div class="inv-actions">
@@ -483,6 +484,7 @@ function openProductModal(docId = null) {
     document.getElementById("pf-description").value  = p.description || "";
     const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
     document.getElementById("pf-images").value       = imgs.join("\n");
+    document.getElementById("pf-notes").value        = p.notes || "";
     document.getElementById("pf-featured").checked   = !!p.featured;
   }
 
@@ -557,6 +559,7 @@ productSaveBtn.addEventListener("click", async () => {
     reviewCount: reviewRaw       ? parseInt(reviewRaw, 10)  : 0,
     description: document.getElementById("pf-description").value.trim(),
     images:      imagesList,
+    notes:       document.getElementById("pf-notes").value.trim(),
     featured:    document.getElementById("pf-featured").checked,
     updatedAt:   serverTimestamp(),
   };
