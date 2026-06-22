@@ -5,7 +5,6 @@
 
 import { db } from "./firebase-config.js";
 import {
-  createOrderWithInventory,
   getAvailableCount,
   normalizeProduct,
 } from "./inventory.js";
@@ -21,7 +20,6 @@ import {
 
 let products       = [];
 let categories     = ["All"];
-let cart           = JSON.parse(localStorage.getItem("formamaker_cart") || "[]");
 let activeCategory = "All";
 let searchQuery    = "";
 
@@ -29,20 +27,10 @@ let searchQuery    = "";
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
 const els = {
-  cartCount:       document.getElementById("cart-count"),
-  cartDrawer:      document.getElementById("cart-drawer"),
-  cartOverlay:     document.getElementById("cart-overlay"),
-  cartItems:       document.getElementById("cart-items"),
-  cartSubtotal:    document.getElementById("cart-subtotal"),
-  cartEmpty:       document.getElementById("cart-empty"),
-  cartFormSection: document.getElementById("cart-form-section"),
-  categoryList:    document.getElementById("category-list"),
-  productGrid:     document.getElementById("product-grid"),
-  featuredGrid:    document.getElementById("featured-grid"),
-  searchInput:     document.getElementById("search-input"),
-  orderForm:       document.getElementById("order-form"),
-  orderSuccess:    document.getElementById("order-success"),
-  toast:           document.getElementById("toast"),
+  categoryList:  document.getElementById("category-list"),
+  productGrid:   document.getElementById("product-grid"),
+  featuredGrid:  document.getElementById("featured-grid"),
+  searchInput:   document.getElementById("search-input"),
 };
 
 
@@ -61,6 +49,10 @@ function deriveCategories() {
       categories.push(p.category);
     }
   });
+}
+
+function openEbayUrl(url) {
+  if (url) window.open(url, "_blank", "noopener,noreferrer");
 }
 
 
@@ -98,6 +90,7 @@ function buildProductCard(p) {
   const stockLabel    = available === null
     ? ""
     : `<span class="product-stock${soldOut ? " sold-out" : ""}">${soldOut ? "Sold out" : `${available} available`}</span>`;
+  const hasEbay       = !!p.ebayUrl;
 
   return `
     <article class="product-card" data-id="${p._docId}">
@@ -125,11 +118,12 @@ function buildProductCard(p) {
           </div>
           ${stockLabel}
           <button
-            class="btn btn-primary btn-sm add-to-cart"
+            class="btn btn-primary btn-sm buy-at-ebay"
             data-id="${p._docId}"
-            aria-label="Add ${p.name} to cart"
-            ${soldOut ? "disabled" : ""}
-          >${soldOut ? "Sold Out" : "Add"}</button>
+            data-ebay-url="${p.ebayUrl || ""}"
+            aria-label="Buy ${p.name} at eBay"
+            ${!hasEbay ? "disabled" : ""}
+          >Buy at eBay</button>
         </div>
       </div>
     </article>
@@ -195,7 +189,6 @@ function subscribeToProducts() {
   const q = query(collection(db, "products"), orderBy("name"));
   onSnapshot(q, snapshot => {
     products = snapshot.docs.map(d => normalizeProduct({ _docId: d.id, ...d.data() }, d.id));
-    syncCartWithProducts();
     deriveCategories();
     renderCategories();
     renderFeatured();
@@ -204,163 +197,6 @@ function subscribeToProducts() {
     console.error("Failed to load products:", err);
     els.productGrid.innerHTML = `<div class="no-results"><p>Could not load products.</p></div>`;
   });
-}
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// CART
-// ═════════════════════════════════════════════════════════════════════════════
-
-function addToCart(docId) {
-  const product = products.find(p => p._docId === docId);
-  if (!product) return;
-  const available = getAvailableCount(product);
-
-  const existing = cart.find(item => item.id === docId);
-  const nextQty = (existing?.qty || 0) + 1;
-  if (available !== null && nextQty > available) {
-    showToast(available === 0 ? `"${product.name}" is sold out` : `Only ${available} "${product.name}" available`);
-    return;
-  }
-
-  if (existing) {
-    existing.qty = nextQty;
-  } else {
-    const imgs = getImages(product);
-    cart.push({
-      id:       docId,
-      productId: product.productId || "",
-      name:     product.name,
-      category: product.category,
-      price:    Number(product.price),
-      image:    imgs[0] || "",
-      qty:      1,
-    });
-  }
-
-  persistCart();
-  updateCartBadge();
-  showToast(`"${product.name}" added`);
-}
-
-function removeFromCart(docId) {
-  cart = cart.filter(item => item.id !== docId);
-  persistCart();
-  updateCartBadge();
-  renderCartItems();
-}
-
-function changeQty(docId, delta) {
-  const item = cart.find(i => i.id === docId);
-  if (!item) return;
-  const nextQty = item.qty + delta;
-  if (nextQty <= 0) { removeFromCart(docId); return; }
-
-  const product = products.find(p => p._docId === docId);
-  const available = getAvailableCount(product);
-  if (delta > 0 && available !== null && nextQty > available) {
-    showToast(available === 0 ? `"${item.name}" is sold out` : `Only ${available} "${item.name}" available`);
-    return;
-  }
-
-  item.qty = nextQty;
-  persistCart();
-  updateCartBadge();
-  renderCartItems();
-}
-
-function syncCartWithProducts() {
-  let changed = false;
-
-  cart = cart.filter(item => {
-    const product = products.find(p => p._docId === item.id);
-    if (!product) {
-      changed = true;
-      return false;
-    }
-
-    const nextImage = getImages(product)[0] || "";
-    if (
-      item.name !== product.name
-      || item.category !== product.category
-      || item.price !== Number(product.price)
-      || item.image !== nextImage
-      || item.productId !== (product.productId || "")
-    ) {
-      item.name = product.name;
-      item.category = product.category;
-      item.price = Number(product.price);
-      item.image = nextImage;
-      item.productId = product.productId || "";
-      changed = true;
-    }
-
-    return true;
-  });
-
-  if (changed) {
-    persistCart();
-    updateCartBadge();
-    if (els.cartDrawer.classList.contains("open")) renderCartItems();
-  }
-}
-
-function persistCart() {
-  localStorage.setItem("formamaker_cart", JSON.stringify(cart));
-}
-
-function cartTotal() {
-  return cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-}
-
-function cartItemCount() {
-  return cart.reduce((sum, item) => sum + item.qty, 0);
-}
-
-function updateCartBadge() {
-  const count = cartItemCount();
-  els.cartCount.textContent = count || "";
-  els.cartCount.classList.toggle("visible", count > 0);
-  document.getElementById("cart-btn").setAttribute("aria-label", `Open cart (${count} items)`);
-}
-
-function renderCartItems() {
-  if (cart.length === 0) {
-    els.cartEmpty.style.display       = "flex";
-    els.cartFormSection.style.display = "none";
-    els.cartItems.innerHTML           = "";
-    els.cartSubtotal.textContent      = "$0.00";
-    return;
-  }
-
-  els.cartEmpty.style.display       = "none";
-  els.cartFormSection.style.display = "block";
-
-  els.cartItems.innerHTML = cart.map(item => `
-    <div class="cart-item" data-id="${item.id}">
-      <img
-        src="${item.image}"
-        alt="${item.name}"
-        class="cart-item-img"
-        onerror="this.src='https://placehold.co/80x80/1E1E1E/444444?text=?'"
-      >
-      <div class="cart-item-info">
-        <p class="cart-item-name">${item.name}</p>
-        <p class="cart-item-unit-price">$${item.price.toFixed(2)} each</p>
-        <div class="cart-qty-controls">
-          <button class="qty-btn" data-id="${item.id}" data-delta="-1" aria-label="Decrease quantity">−</button>
-          <span class="qty-value">${item.qty}</span>
-          <button class="qty-btn" data-id="${item.id}" data-delta="1" aria-label="Increase quantity">+</button>
-        </div>
-      </div>
-      <div class="cart-item-right">
-        <span class="cart-item-line-total">$${(item.price * item.qty).toFixed(2)}</span>
-        <button class="remove-btn" data-id="${item.id}" aria-label="Remove ${item.name}">✕</button>
-      </div>
-    </div>
-  `).join("");
-
-  els.cartSubtotal.textContent = `$${cartTotal().toFixed(2)}`;
 }
 
 
@@ -383,12 +219,12 @@ function openLightbox(docId) {
   document.getElementById("lightbox-old-price").textContent = p.oldPrice ? `$${Number(p.oldPrice).toFixed(2)}` : "";
   document.getElementById("lightbox-rating").innerHTML  =
     buildStars(p.rating || 0) + `<span class="review-count">(${p.reviewCount || 0})</span>`;
+
   const addBtn = document.getElementById("lightbox-add-btn");
-  const available = getAvailableCount(p);
-  const soldOut = available === 0;
-  addBtn.dataset.id = docId;
-  addBtn.disabled = soldOut;
-  addBtn.textContent = soldOut ? "Sold Out" : "Add to Cart";
+  addBtn.dataset.id      = docId;
+  addBtn.dataset.ebayUrl = p.ebayUrl || "";
+  addBtn.disabled        = !p.ebayUrl;
+  addBtn.textContent     = "Buy at eBay";
 
   setLightboxImage(0);
 
@@ -428,144 +264,11 @@ function closeLightbox() {
 }
 
 
-// ─── Cart drawer ──────────────────────────────────────────────────────────────
-
-function openCart() {
-  renderCartItems();
-  els.cartDrawer.classList.add("open");
-  els.cartOverlay.classList.add("visible");
-  document.body.classList.add("no-scroll");
-  els.orderSuccess.style.display = "none";
-  els.orderForm.style.display    = "block";
-}
-
-function closeCart() {
-  els.cartDrawer.classList.remove("open");
-  els.cartOverlay.classList.remove("visible");
-  document.body.classList.remove("no-scroll");
-}
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ORDER FORM
-// ═════════════════════════════════════════════════════════════════════════════
-
-async function handleOrderSubmit(e) {
-  e.preventDefault();
-  clearFormErrors();
-
-  const customerName    = document.getElementById("field-name").value.trim();
-  const productDetails  = document.getElementById("field-product").value.trim();
-  const deliveryDetails = document.getElementById("field-delivery").value.trim();
-
-  let valid = true;
-  if (!customerName)    { markFieldError("field-name",     "Your name is required."); valid = false; }
-  if (!productDetails)  { markFieldError("field-product",  "Please describe what you'd like."); valid = false; }
-  if (!deliveryDetails) { markFieldError("field-delivery", "Please add delivery details."); valid = false; }
-  if (cart.length === 0) {
-    showBannerError("Please add at least one item to your cart before sending a request.");
-    valid = false;
-  }
-  for (const item of cart) {
-    const product = products.find(p => p._docId === item.id);
-    const available = getAvailableCount(product);
-    if (available !== null && item.qty > available) {
-      showBannerError(`${item.name} only has ${available} available right now.`);
-      valid = false;
-      break;
-    }
-  }
-  if (!valid) return;
-
-  const orderData = {
-    customerName,
-    productDetails,
-    deliveryDetails,
-    items: cart.map(item => ({
-      id:       item.id,
-      productId: item.productId,
-      name:     item.name,
-      category: item.category,
-      price:    item.price,
-      qty:      item.qty,
-      subtotal: parseFloat((item.price * item.qty).toFixed(2)),
-    })),
-    total:  parseFloat(cartTotal().toFixed(2)),
-    status: "new",
-  };
-
-  const submitBtn = document.getElementById("submit-order-btn");
-  submitBtn.disabled    = true;
-  submitBtn.textContent = "Sending…";
-
-  try {
-    await createOrderWithInventory(orderData);
-
-    cart = [];
-    persistCart();
-    updateCartBadge();
-
-    els.orderForm.style.display    = "none";
-    els.orderSuccess.style.display = "flex";
-
-  } catch (err) {
-    console.error("Firestore submission error:", err);
-    showBannerError(err.message || "Something went wrong. Please try again or contact us directly.");
-    submitBtn.disabled    = false;
-    submitBtn.textContent = "Send Order Request";
-  }
-}
-
-function clearFormErrors() {
-  document.querySelectorAll(".field-error-msg").forEach(el => el.remove());
-  document.querySelectorAll(".input-error").forEach(el => el.classList.remove("input-error"));
-  document.getElementById("form-banner-error")?.remove();
-}
-
-function markFieldError(fieldId, message) {
-  const field = document.getElementById(fieldId);
-  field.classList.add("input-error");
-  field.setAttribute("aria-invalid", "true");
-  const msg = document.createElement("span");
-  msg.className   = "field-error-msg";
-  msg.textContent = message;
-  field.insertAdjacentElement("afterend", msg);
-}
-
-function showBannerError(message) {
-  document.getElementById("form-banner-error")?.remove();
-  const banner = document.createElement("div");
-  banner.id          = "form-banner-error";
-  banner.className   = "form-banner-error";
-  banner.textContent = message;
-  els.orderForm.prepend(banner);
-}
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// TOAST
-// ═════════════════════════════════════════════════════════════════════════════
-
-let toastTimer = null;
-
-function showToast(message) {
-  els.toast.textContent = message;
-  els.toast.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => els.toast.classList.remove("show"), 2400);
-}
-
-
 // ═════════════════════════════════════════════════════════════════════════════
 // EVENTS
 // ═════════════════════════════════════════════════════════════════════════════
 
 function bindEvents() {
-
-  // Cart open / close
-  document.getElementById("cart-btn").addEventListener("click", openCart);
-  document.getElementById("cart-close-btn").addEventListener("click", closeCart);
-  els.cartOverlay.addEventListener("click", closeCart);
 
   // Category chips
   els.categoryList.addEventListener("click", e => {
@@ -592,11 +295,11 @@ function bindEvents() {
     }
   });
 
-  // Add to cart (delegated — uses string docId)
+  // Buy at eBay (delegated)
   document.addEventListener("click", e => {
-    const btn = e.target.closest(".add-to-cart");
+    const btn = e.target.closest(".buy-at-ebay");
     if (!btn) return;
-    addToCart(btn.dataset.id);
+    openEbayUrl(btn.dataset.ebayUrl);
   });
 
   // Lightbox — open on product image click
@@ -632,30 +335,10 @@ function bindEvents() {
     if (dot) setLightboxImage(parseInt(dot.dataset.index, 10));
   });
 
-  // Lightbox — add to cart (string docId)
+  // Lightbox — Buy at eBay
   document.getElementById("lightbox-add-btn").addEventListener("click", e => {
-    addToCart(e.currentTarget.dataset.id);
+    openEbayUrl(e.currentTarget.dataset.ebayUrl);
     closeLightbox();
-  });
-
-  // Cart item qty / remove (delegated — string docId)
-  els.cartItems.addEventListener("click", e => {
-    const qtyBtn    = e.target.closest(".qty-btn");
-    const removeBtn = e.target.closest(".remove-btn");
-    if (qtyBtn)    changeQty(qtyBtn.dataset.id, parseInt(qtyBtn.dataset.delta, 10));
-    if (removeBtn) removeFromCart(removeBtn.dataset.id);
-  });
-
-  // Order form
-  els.orderForm.addEventListener("submit", handleOrderSubmit);
-  els.orderForm.addEventListener("focusin", e => {
-    if (e.target.matches("input, textarea")) {
-      e.target.classList.remove("input-error");
-      e.target.setAttribute("aria-invalid", "false");
-      if (e.target.nextElementSibling?.classList.contains("field-error-msg")) {
-        e.target.nextElementSibling.remove();
-      }
-    }
   });
 
   // Hero CTA
@@ -674,14 +357,6 @@ function bindEvents() {
       document.getElementById("mobile-menu").classList.remove("open")
     )
   );
-
-  // "Browse More" after success
-  document.getElementById("new-order-btn")?.addEventListener("click", () => {
-    els.orderSuccess.style.display = "none";
-    els.orderForm.style.display    = "block";
-    els.orderForm.reset();
-    closeCart();
-  });
 }
 
 
@@ -690,7 +365,6 @@ function bindEvents() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function init() {
-  updateCartBadge();
   bindEvents();
   subscribeToProducts();
 }

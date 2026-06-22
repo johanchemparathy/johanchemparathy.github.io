@@ -485,6 +485,7 @@ function openProductModal(docId = null) {
     const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
     document.getElementById("pf-images").value       = imgs.join("\n");
     document.getElementById("pf-notes").value        = p.notes || "";
+    document.getElementById("pf-ebay-url").value     = p.ebayUrl || "";
     document.getElementById("pf-featured").checked   = !!p.featured;
   }
 
@@ -560,6 +561,7 @@ productSaveBtn.addEventListener("click", async () => {
     description: document.getElementById("pf-description").value.trim(),
     images:      imagesList,
     notes:       document.getElementById("pf-notes").value.trim(),
+    ebayUrl:     document.getElementById("pf-ebay-url").value.trim(),
     featured:    document.getElementById("pf-featured").checked,
     updatedAt:   serverTimestamp(),
   };

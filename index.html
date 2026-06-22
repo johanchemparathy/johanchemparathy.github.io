@@ -30,10 +30,6 @@
     </a>
 
     <div class="header-right">
-      <button id="cart-btn" class="cart-btn" aria-label="Open cart (0 items)">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-        <span id="cart-count" class="cart-count" aria-live="polite"></span>
-      </button>
       <button id="hamburger-btn" class="hamburger-btn mobile-only" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
         <span></span><span></span><span></span>
       </button>
@@ -149,81 +145,6 @@
 </footer>
 
 
-<!-- ═══ CART DRAWER ══════════════════════════════════════════════════════════ -->
-<div id="cart-overlay" class="cart-overlay" aria-hidden="true"></div>
-
-<aside id="cart-drawer" class="cart-drawer" aria-label="Cart and order form" aria-modal="true" role="dialog">
-
-  <div class="cart-header">
-    <h2>Your Order</h2>
-    <button id="cart-close-btn" class="cart-close-btn" aria-label="Close cart">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-  </div>
-
-  <div class="cart-body">
-
-    <div id="cart-empty" class="cart-empty" style="display:flex;">
-      <div class="cart-empty-icon" aria-hidden="true">○</div>
-      <p>Your cart is empty.</p>
-      <p>Add some prints to get started.</p>
-    </div>
-
-    <div id="cart-items" class="cart-items" aria-live="polite"></div>
-
-    <div class="cart-subtotal-row" aria-live="polite">
-      <span>Subtotal</span>
-      <span id="cart-subtotal" class="cart-subtotal-amount">$0.00</span>
-    </div>
-
-    <div id="cart-form-section" class="cart-form-section" style="display:none;">
-
-      <div class="cart-notice" role="note">
-        <strong>Order request only.</strong> The owner will review and contact you to confirm. No payment needed now.
-      </div>
-
-      <form id="order-form" class="order-form" novalidate aria-label="Order request form">
-
-        <div class="form-group">
-          <label for="field-name">Your Name <span class="required" aria-hidden="true">*</span></label>
-          <input type="text" id="field-name" name="customerName" placeholder="e.g. Jane Smith" autocomplete="name" required>
-        </div>
-
-        <div class="form-group">
-          <label for="field-product">Product Details <span class="required" aria-hidden="true">*</span></label>
-          <textarea id="field-product" name="productDetails" rows="4" placeholder="Colour, size, custom text, variations — any specifics about what you'd like…" required></textarea>
-        </div>
-
-        <div class="form-group">
-          <label for="field-delivery">Delivery Details <span class="required" aria-hidden="true">*</span></label>
-          <textarea id="field-delivery" name="deliveryDetails" rows="3" placeholder="Where and when would you like to meet? Your area, preferred times…" required></textarea>
-        </div>
-
-        <button type="submit" id="submit-order-btn" class="btn btn-primary btn-full btn-lg">
-          Send Order Request
-        </button>
-
-        <p class="form-disclaimer">We'll contact you to confirm and arrange in-person delivery. No payment needed now.</p>
-
-      </form>
-
-      <div id="order-success" class="order-success" style="display:none;" role="alert">
-        <div class="success-icon" aria-hidden="true">✓</div>
-        <h3>Request Sent!</h3>
-        <p>Your order request has been received. We'll be in touch to confirm and arrange delivery.</p>
-        <p><strong>No payment needed right now.</strong></p>
-        <button id="new-order-btn" class="btn btn-ghost btn-full">Browse More Prints</button>
-      </div>
-
-    </div>
-  </div>
-</aside>
-
-
-<!-- ═══ TOAST ════════════════════════════════════════════════════════════════ -->
-<div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-
 <!-- ═══ LIGHTBOX ═════════════════════════════════════════════════════════════ -->
 <div id="lightbox-overlay" class="lightbox-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Product image">
   <button id="lightbox-close" class="lightbox-close" aria-label="Close">
@@ -246,7 +167,7 @@
           <span class="lightbox-price" id="lightbox-price"></span>
           <span class="lightbox-old-price" id="lightbox-old-price"></span>
         </div>
-        <button class="btn btn-primary" id="lightbox-add-btn">Add to Cart</button>
+        <button class="btn btn-primary" id="lightbox-add-btn">Buy at eBay</button>
       </div>
     </div>
   </div>
