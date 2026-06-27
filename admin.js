@@ -617,6 +617,7 @@ const orderSaveBtn      = document.getElementById("order-save-btn");
 function openOrderModal() {
   orderModalItems = [];
   orderModalForm.reset();
+  document.getElementById("of-custom-qty").value = "1";
   orderFormError.style.display = "none";
   populateProductPicker();
   renderOrderModalItems();
@@ -747,6 +748,32 @@ function renderOrderModalItems() {
   );
 }
 
+function addCustomOrderItem() {
+  const name  = document.getElementById("of-custom-name").value.trim();
+  const price = parseFloat(document.getElementById("of-custom-price").value);
+  const qty   = parseInt(document.getElementById("of-custom-qty").value, 10) || 1;
+
+  if (!name)        { showOrderFormError("Custom item name is required."); return; }
+  if (isNaN(price) || price < 0) { showOrderFormError("Enter a valid price for the custom item."); return; }
+
+  refreshOrderModalInventoryError();
+  orderModalItems.push({
+    id:        `custom-${Date.now()}`,
+    productId: "",
+    name,
+    category:  "Custom",
+    price:     parseFloat(price.toFixed(2)),
+    image:     "",
+    qty:       Math.max(1, qty),
+    custom:    true,
+  });
+
+  document.getElementById("of-custom-name").value  = "";
+  document.getElementById("of-custom-price").value = "";
+  document.getElementById("of-custom-qty").value   = "1";
+  renderOrderModalItems();
+}
+
 function showOrderFormError(msg) {
   orderFormError.textContent   = msg;
   orderFormError.style.display = "block";
@@ -763,6 +790,8 @@ document.getElementById("of-add-item-btn").addEventListener("click", () => {
   addOrderModalItem(picker.value);
   picker.value = "";
 });
+
+document.getElementById("of-add-custom-btn").addEventListener("click", addCustomOrderItem);
 
 orderSaveBtn.addEventListener("click", async () => {
   orderFormError.style.display = "none";

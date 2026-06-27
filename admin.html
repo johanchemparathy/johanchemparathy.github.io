@@ -765,6 +765,16 @@
           </div>
         </div>
 
+        <div style="margin-bottom:14px;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-mid);display:block;margin-bottom:6px;">Or add a custom item</label>
+          <div style="display:flex;gap:8px;margin-bottom:6px;">
+            <input type="text" id="of-custom-name" placeholder="Item name" style="flex:2;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:.875rem;background:var(--bg);color:var(--text);">
+            <input type="number" id="of-custom-price" placeholder="Price" min="0" step="0.01" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:.875rem;background:var(--bg);color:var(--text);">
+            <input type="number" id="of-custom-qty" placeholder="Qty" min="1" step="1" value="1" style="width:60px;padding:9px 8px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:.875rem;background:var(--bg);color:var(--text);">
+            <button type="button" id="of-add-custom-btn" class="btn btn-outline btn-sm">Add</button>
+          </div>
+        </div>
+
         <div id="of-items-list" style="display:none;margin-bottom:14px;">
           <div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Order Items</div>
           <div id="of-items-rows"></div>

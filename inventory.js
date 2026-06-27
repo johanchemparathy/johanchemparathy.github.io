@@ -74,6 +74,7 @@ function buildConsumedItemMap(order) {
 
   (order.items || []).forEach(item => {
     if (!item?.id) return;
+    if (item.custom) return;  // custom line-items have no product doc; skip inventory
     const qty = toCount(item.qty) || 0;
     if (qty <= 0) return;
 
