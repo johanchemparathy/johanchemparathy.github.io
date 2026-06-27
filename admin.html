@@ -556,7 +556,12 @@
 
         <div class="orders-toolbar">
           <span class="orders-title">Expenses <span id="exp-count" style="font-weight:400;color:var(--text-muted);font-size:.85rem;"></span></span>
-          <button id="add-expense-btn" class="btn btn-primary btn-sm">+ Add Expense</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="exp-category-filter" style="padding:7px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:.8rem;background:var(--bg);color:var(--text);cursor:pointer;">
+              <option value="">All Categories</option>
+            </select>
+            <button id="add-expense-btn" class="btn btn-primary btn-sm">+ Add Expense</button>
+          </div>
         </div>
 
         <div id="expenses-list" class="expense-list">

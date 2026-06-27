@@ -39,7 +39,8 @@ let allExpenses      = [];
 let activeFilter     = "all";
 let inventorySearchQuery = "";
 let editingDocId     = null;   // null = new product, string = editing existing
-let editingExpenseId = null;
+let editingExpenseId      = null;
+let activeExpenseCategory = "";
 let unsubOrders      = null;
 let unsubProducts    = null;
 let unsubExpenses    = null;
@@ -855,13 +856,30 @@ function subscribeToExpenses() {
   });
 }
 
+function refreshExpenseCategoryFilter() {
+  const select = document.getElementById("exp-category-filter");
+  if (!select) return;
+  const cats = [...new Set(allExpenses.map(e => e.category).filter(Boolean))].sort();
+  const prev = activeExpenseCategory;
+  select.innerHTML =
+    '<option value="">All Categories</option>' +
+    cats.map(c => `<option value="${escHtml(c)}"${c === prev ? " selected" : ""}>${escHtml(c)}</option>`).join("");
+  if (!cats.includes(prev)) activeExpenseCategory = "";
+}
+
 function renderExpenses() {
+  refreshExpenseCategoryFilter();
+
+  const filtered = activeExpenseCategory
+    ? allExpenses.filter(e => e.category === activeExpenseCategory)
+    : allExpenses;
+
   const countEl = document.getElementById("exp-count");
   if (countEl) {
-    const total = allExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-    countEl.textContent = allExpenses.length
-      ? `(${allExpenses.length} · $${total.toFixed(2)} total)`
-      : "";
+    const total = filtered.reduce((s, e) => s + (e.amount || 0), 0);
+    countEl.textContent = filtered.length
+      ? `(${filtered.length} · $${total.toFixed(2)}${activeExpenseCategory ? " filtered" : " total"})`
+      : activeExpenseCategory ? "(no results)" : "";
   }
 
   if (allExpenses.length === 0) {
@@ -873,7 +891,16 @@ function renderExpenses() {
     return;
   }
 
-  expensesList.innerHTML = allExpenses.map(buildExpenseRow).join("");
+  if (filtered.length === 0) {
+    expensesList.innerHTML = `
+      <div class="admin-state">
+        <div class="admin-state-icon">○</div>
+        <p>No expenses in this category.</p>
+      </div>`;
+    return;
+  }
+
+  expensesList.innerHTML = filtered.map(buildExpenseRow).join("");
 
   expensesList.querySelectorAll(".exp-edit-btn").forEach(btn =>
     btn.addEventListener("click", () => openExpenseModal(btn.dataset.id))
@@ -939,6 +966,11 @@ document.getElementById("expense-modal-close").addEventListener("click", closeEx
 document.getElementById("expense-modal-cancel").addEventListener("click", closeExpenseModal);
 expenseModalOverlay.addEventListener("click", e => { if (e.target === expenseModalOverlay) closeExpenseModal(); });
 document.getElementById("add-expense-btn").addEventListener("click", () => openExpenseModal());
+
+document.getElementById("exp-category-filter").addEventListener("change", e => {
+  activeExpenseCategory = e.target.value;
+  renderExpenses();
+});
 
 expenseSaveBtn.addEventListener("click", async () => {
   expenseFormError.style.display = "none";
