@@ -818,6 +818,7 @@ orderSaveBtn.addEventListener("click", async () => {
       price:    item.price,
       qty:      item.qty,
       subtotal: parseFloat((item.price * item.qty).toFixed(2)),
+      ...(item.custom ? { custom: true } : {}),
     })),
     total:     parseFloat(total.toFixed(2)),
     status:    "new",
