@@ -280,6 +280,7 @@ function buildOrderCard(order) {
     ? order.createdAt.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : "—";
   const itemCount = (order.items || []).reduce((s, i) => s + (i.qty || 1), 0);
+  const itemsSummary = (order.items || []).map(i => escHtml(i.name)).join(", ");
   const status = order.status || "new";
   const itemsRows = (order.items || []).map(item => `
     <tr>
@@ -305,6 +306,7 @@ function buildOrderCard(order) {
           <div class="order-id">#${order._id.slice(0,8).toUpperCase()}${adminBadge}</div>
           <div class="order-customer">${escHtml(order.customerName || "—")}</div>
           <div class="order-items-count">${itemCount} item${itemCount !== 1 ? "s" : ""}</div>
+          <div class="order-items-summary">${itemsSummary}</div>
         </div>
         <div class="order-col-date">${date}</div>
         <div class="order-col-total">$${(order.total || 0).toFixed(2)}</div>
